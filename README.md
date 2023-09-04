@@ -71,6 +71,25 @@ test('can login', async ({ harness }) => {
 })
 ```
 
+You can optional pass a `data` object as the second argument to the `create`
+function to override the fake data that is generated. If you pass in data
+for a foreign key column, the harness will not create a record for that table.
+
+```ts
+test('can login', async ({ harness }) => {
+  const user = await harness.create('public', 'user', {
+    email: 'some-email@supawrightmail.com',
+  })
+  const session = await harness.create('public', 'session', {
+    user_id: user.id,
+  })
+  // The harness will not create a user record, since we've passed in
+  // a user_id.
+  const { data: users } = await harness.supabase().from('user').select()
+  expect(users.length).toBe(1)
+})
+```
+
 When the test exits, the harness will automatically clean up all the records
 it has created, and will inspect foreign key constraints to delete records in
 the correct order.
