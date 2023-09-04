@@ -29,8 +29,8 @@ import { supawright } from 'supawright'
 import type { Database } from './database'
 
 const test = supawright<
-    Database,
-    'public' | 'other',  // Note 1
+  Database,
+  'public' | 'other' // Note 1
 >(['public', 'other'])
 ```
 
@@ -66,8 +66,8 @@ any columns that are not nullable and do not have a default value.
 
 ```ts
 test('can login', async ({ harness }) => {
-    const session = await harness.create('public', 'session')
-    expect(session.user_id).toBeDefined()
+  const session = await harness.create('public', 'session')
+  expect(session.user_id).toBeDefined()
 })
 ```
 
@@ -83,18 +83,17 @@ This runs recursively. Consider the following example:
 
 ```ts
 test('can login', async ({ harness }) => {
-    const user = await harness.create('public', 'user')
+  const user = await harness.create('public', 'user')
 
-    // Since we're using the standard Supabase client provided
-    // by the harness here, the harness is unaware of the records
-    // we're creating.
-    await harness.supabase().from('session').insert([
-        { user_id: user.id },
-        { user_id: user.id },
-    ])
-    
-    // However, the harness will discover these records and delete
-    // them when the test exits.
+  // Since we're using the standard Supabase client here, the
+  // harness is unaware of the records we're creating.
+  await harness
+    .supabase()
+    .from('session')
+    .insert([{ user_id: user.id }, { user_id: user.id }])
+
+  // However, the harness will discover these records and delete
+  // them when the test exits.
 })
 ```
 
@@ -107,6 +106,9 @@ function.
 The `generators` object is a record of Postgres types to functions that return
 a value of that type. The harness will use these functions to generate fake
 data for any columns that are not nullable and do not have a default value.
+
+If you're using user defined types, specify the `USER-DEFINED` type name in
+the `generators` object. This will be used for enums, for example.
 
 The `overrides` object is a record of schema names to a record of table names
 to functions that return a record of column names to values. The harness will
@@ -159,23 +161,26 @@ use the default Supabase localhost database. If you'd like to override this, pro
 a `database` key in the config object.
 
 ```ts
-const test = supawright<
-    Database,
-    'public' | 'other',
->(
-    ['public', 'other'],
-    {
-        supabase: {
-            supabaseUrl: 'my-supabase-url.com',
-            serviceRoleKey: 'my-service-role-key'
-        },
-        database: {
-            host: 'localhost',
-            port: 5432,
-            user: 'me',
-            password: 'password',
-            database: 'my-database'
-        }
-    }
-)
+const test = supawright<Database, 'public' | 'other'>(['public', 'other'], {
+  supabase: {
+    supabaseUrl: 'my-supabase-url.com',
+    serviceRoleKey: 'my-service-role-key'
+  },
+  database: {
+    host: 'localhost',
+    port: 5432,
+    user: 'me',
+    password: 'password',
+    database: 'my-database'
+  }
+})
 ```
+
+## TODO
+
+- [ ] Automatically infer allowed enum values from database
+- [ ] Automatically infer custom composite types from database
+- [ ] Fix up my janky typings
+- [ ] Come up with a way of using the `Database` type without having to modify
+      the generated Supabase types
+  - This may involve convincing Supabase to change up their generated types
