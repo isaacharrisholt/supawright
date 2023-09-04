@@ -1,1 +1,1 @@
-export { TestHarness } from './harness'
+export { supawright } from './test'
