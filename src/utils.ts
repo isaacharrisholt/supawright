@@ -8,12 +8,6 @@ export function createSupabaseTestClient<
   credentials: SupabaseClientCredentials,
   schema?: Schema
 ): SupabaseClient<Database, Schema> {
-  if (!process.env.PUBLIC_SUPABASE_URL) {
-    throw Error('PUBLIC_SUPABASE_URL is not set')
-  }
-  if (!process.env.PRIVATE_SUPABASE_SERVICE_ROLE_KEY) {
-    throw Error('PRIVATE_SUPABASE_SERVICE_ROLE_KEY is not set')
-  }
   return createClient(credentials.supabaseUrl, credentials.serviceRoleKey, {
     db: { schema },
     auth: { persistSession: false }

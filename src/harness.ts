@@ -14,6 +14,7 @@ import type {
   TableIn
 } from './types'
 import { createSupabaseTestClient, log } from './utils'
+import type { Configuration as PostgresConfig } from 'ts-postgres'
 
 type Generator<Database extends GenericDatabase, Schema extends SchemaOf<Database>> =
   | (() => unknown)
@@ -46,7 +47,8 @@ export type HarnessOptions<
       [Table in TableIn<Database, S>]?: Creator<Database, Schema, Table>
     }
   }
-  supabaseClientCredentials?: SupabaseClientCredentials
+  supabase?: SupabaseClientCredentials
+  database?: PostgresConfig
 }
 
 /**
@@ -72,7 +74,7 @@ export class TestHarness<
     if (!schemas.length) {
       throw new Error('No schemas provided')
     }
-    const tables = await getSchemaTree(schemas)
+    const tables = await getSchemaTree(schemas, options?.database)
     return new TestHarness(schemas, tables, options)
   }
 
@@ -226,10 +228,10 @@ export class TestHarness<
     schema = schema ?? (this.schemas[0] as Schema)
     const credentials = {
       supabaseUrl:
-        this.options?.supabaseClientCredentials?.supabaseUrl ??
+        this.options?.supabase?.supabaseUrl ??
         process.env.SUPABASE_URL,
       serviceRoleKey:
-        this.options?.supabaseClientCredentials?.serviceRoleKey ??
+        this.options?.supabase?.serviceRoleKey ??
         process.env.SUPABASE_SERVICE_ROLE_KEY
     }
     if (!credentials.supabaseUrl) {
