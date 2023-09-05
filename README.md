@@ -2,6 +2,11 @@
 
 Supawright is a Playwright test harness for E2E testing with Supabase.
 
+Supawright can create database tables and records for you, and will clean up
+after itself when the test exits. It will create records recursively based on
+foreign key constraints, and will automatically discover any related records
+that were not created by Supawright and delete them as well.
+
 ## Installation
 
 ```bash
@@ -22,26 +27,26 @@ line in your generated Supabase types (typically `database.ts`):
 ```
 
 Then, create a test file, e.g. `can-login.test.ts`, and create a test function
-with the `supawright` function:
+with the `withSupawright` function:
 
 ```ts
-import { supawright } from 'supawright'
+import { withSupawright } from 'supawright'
 import type { Database } from './database'
 
-const test = supawright<
+const test = withSupawright<
   Database,
   'public' | 'other' // Note 1
 >(['public', 'other'])
 ```
 
-Unfortunately, I haven't found a nice way of infering the schema names from the
-first argument, so you'll have to specify the schemas you'd like the harness to
-use in two places.
+1: Unfortunately, I haven't found a nice way of infering the schema names from
+the first argument, so you'll have to specify the schemas you'd like Supawright
+to use in two places.
 
 ### Tests
 
 Assuming you have a `test` function as above, you can now write tests and use
-the `harness` fixture to recursively create database tables. Consider the
+the `supawright` fixture to recursively create database tables. Consider the
 following table structure:
 
 ```sql
@@ -59,59 +64,61 @@ create table public.session (
 );
 ```
 
-If you use the harness to create a `session`, it will automatically create a
+If you use Supawright to create a `session`, it will automatically create a
 `user` for you, and you can access the `user`'s `id` in the `session`'s
-`user_id` column. The harness will also automatically generate fake data for
+`user_id` column. Supawright will also automatically generate fake data for
 any columns that are not nullable and do not have a default value.
 
 ```ts
-test('can login', async ({ harness }) => {
-  const session = await harness.create('public', 'session')
+test('can login', async ({ supawright }) => {
+  const session = await supawright.create('public', 'session')
   expect(session.user_id).toBeDefined()
 })
 ```
 
 You can optional pass a `data` object as the second argument to the `create`
 function to override the fake data that is generated. If you pass in data
-for a foreign key column, the harness will not create a record for that table.
+for a foreign key column, Supawright will not create a record for that table.
+
+If your table is in the `public` schema, you can omit the schema name:
 
 ```ts
-test('can login', async ({ harness }) => {
-  const user = await harness.create('public', 'user', {
-    email: 'some-email@supawrightmail.com',
+test('can login', async ({ supawright }) => {
+  const user = await supawright.create('user', {
+    email: 'some-email@supawrightmail.com'
   })
-  const session = await harness.create('public', 'session', {
-    user_id: user.id,
+  const session = await supawright.create('session', {
+    user_id: user.id
   })
-  // The harness will not create a user record, since we've passed in
+  // Supawright will not create a user record, since we've passed in
   // a user_id.
-  const { data: users } = await harness.supabase().from('user').select()
+  const { data: users } = await supawright.supabase().from('user').select()
   expect(users.length).toBe(1)
 })
 ```
 
-When the test exits, the harness will automatically clean up all the records
+When the test exits, Supawright will automatically clean up all the records
 it has created, and will inspect foreign key constraints to delete records in
 the correct order.
 
 It will also discover any additional records in the database that were not
-created by the harness, and will delete them as well, provided they have a
-foreign key relationship with a record that was created by the harness.
+created by Supawright, and will delete them as well, provided they have a
+foreign key relationship with a record that was created by Supawright.
 
 This runs recursively. Consider the following example:
 
 ```ts
-test('can login', async ({ harness }) => {
-  const user = await harness.create('public', 'user')
+test('can login', async ({ supawright }) => {
+  const user = await supawright.create('user')
 
-  // Since we're using the standard Supabase client here, the
-  // harness is unaware of the records we're creating.
-  await harness
+  // Since we're using the standard Supabase client here, Supawright
+  // is unaware of the records we're creating.
+  await supawright
     .supabase()
     .from('session')
     .insert([{ user_id: user.id }, { user_id: user.id }])
 
-  // However, the harness will discover these records and delete
+  // However, Supawright will discover these records and delete
   // them when the test exits.
 })
 ```
@@ -123,16 +130,16 @@ records, you can pass optional config as the second argument to the `supawright`
 function.
 
 The `generators` object is a record of Postgres types to functions that return
-a value of that type. The harness will use these functions to generate fake
+a value of that type. Supawright will use these functions to generate fake
 data for any columns that are not nullable and do not have a default value.
 
 If you're using user defined types, specify the `USER-DEFINED` type name in
 the `generators` object. This will be used for enums, for example.
 
 The `overrides` object is a record of schema names to a record of table names
-to functions that return a record of column names to values. The harness will
+to functions that return a record of column names to values. Supawright will
 use these functions to create records in the database. These return an array
-of `Fixtures` which Supawright will use to record the records it has created.
+of `Fixture`s which Supawright will use to record the records it has created.
 
 This is useful if you use a database trigger to populate certain tables and
 need to run custom code to activate the trigger.
@@ -150,7 +157,7 @@ const test = supawright<
         },
         overrides: {
             public: {
-                user: async ({ harness, data, supabase, generators }) => {
+                user: async ({ supawright, data, supabase, generators }) => {
                     const { data: user } = await supabase
                         .from('user')
                         .insert(...)
@@ -180,7 +187,7 @@ use the default Supabase localhost database. If you'd like to override this, pro
 a `database` key in the config object.
 
 ```ts
-const test = supawright<Database, 'public' | 'other'>(['public', 'other'], {
+const test = withSupawright<Database, 'public' | 'other'>(['public', 'other'], {
   supabase: {
     supabaseUrl: 'my-supabase-url.com',
     serviceRoleKey: 'my-service-role-key'

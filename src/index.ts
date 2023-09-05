@@ -1,1 +1,1 @@
-export { supawright } from './test'
+export { withSupawright as supawright } from './test'

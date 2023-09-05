@@ -1,16 +1,10 @@
 import { Fixture, GenericDatabase, SchemaOf, TableIn } from './types'
 
-type ReadonlyFixtures<
-  Database extends GenericDatabase,
-  Schema extends SchemaOf<Database>
-> = {
-  get(): Fixture<Database, Schema, TableIn<Database, Schema>>[]
-  get<S extends Schema, Table extends TableIn<Database, S>>(
-    schema: S,
-    table: Table
-  ): Fixture<Database, Schema, Table>[]
-}
-
+/**
+ * The Fixtures class is a container for fixtures
+ * that makes it easy to add, update, and retrieve
+ * fixtures for a given schema and table.
+ */
 export class Fixtures<
   Database extends GenericDatabase,
   Schema extends SchemaOf<Database>
@@ -36,12 +30,6 @@ export class Fixtures<
 
   public add(fixture: Fixture<Database, Schema, TableIn<Database, Schema>>) {
     this._fixtures.push(fixture)
-  }
-
-  public getReadOnly(): ReadonlyFixtures<Database, Schema> {
-    return {
-      get: this.get.bind(this)
-    }
   }
 
   public update(

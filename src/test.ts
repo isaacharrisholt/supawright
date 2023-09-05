@@ -1,24 +1,24 @@
 import { test } from '@playwright/test'
-import { HarnessOptions, TestHarness } from './harness'
+import { SupawrightOptions, Supawright } from './harness'
 import { GenericDatabase, SchemaOf } from './types'
 
 /**
- * Factory for a test extension that provides a test harness
- * @param schemas Schemas you'd like the test harness to use
- * @param options Options for the test harness
- * @returns A test extension that provides a test harness
+ * Factory for a test extension that provides a Supawright harness
+ * @param schemas Schemas you'd like Supawright to use
+ * @param options Options for Supawright
+ * @returns A test extension that provides a Supawright harness
  */
-export function supawright<
+export function withSupawright<
   Database extends GenericDatabase,
   Schema extends SchemaOf<Database>
->(schemas: [Schema, ...Schema[]], options?: HarnessOptions<Database, Schema>) {
+>(schemas: [Schema, ...Schema[]], options?: SupawrightOptions<Database, Schema>) {
   return test.extend<{
-    harness: TestHarness<Database, Schema>
+    supawright: Supawright<Database, Schema>
   }>({
-    harness: async ({}, use) => {
-      const harness = await TestHarness.new(schemas, options)
-      await use(harness)
-      await harness.teardown()
+    supawright: async ({}, use) => {
+      const supawright = await Supawright.new(schemas, options)
+      await use(supawright)
+      await supawright.teardown()
     }
   })
 }

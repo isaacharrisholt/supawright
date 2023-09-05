@@ -31,18 +31,18 @@ export type Creator<
   Schema extends SchemaOf<Database>,
   Table extends TableIn<Database, Schema>
 > = (params: {
-  harness: TestHarness<Database, Schema>
+  supawright: Supawright<Database, Schema>
   data: Partial<Insert<Database, Schema, Table>>
   supabase: SupabaseClient<Database, Schema>
   generators: Generators<Database, Schema>
 }) => Promise<Fixture<Database, Schema | 'auth', TableIn<Database, Schema> | 'users'>[]>
 
-export type HarnessOptions<
+export type SupawrightOptions<
   Database extends GenericDatabase,
   Schema extends SchemaOf<Database>
 > = {
   generators?: Generators<Database, Schema>
-  creators?: {
+  overrides?: {
     [S in Schema]?: {
       [Table in TableIn<Database, S>]?: Creator<Database, Schema, Table>
     }
@@ -52,37 +52,46 @@ export type HarnessOptions<
 }
 
 /**
- * Test harness class.
+ * Supawright class.
  *
  * This class provides public methods for creating and accessing records required
  * for testing. It also provides a teardown method which removes all records
- * created during the lifecycle of the test harness.
+ * created during the lifecycle of the Supawright instance.
  *
  * Note that the teardown method respects foreign key constraints, so records
  * are removed in an order which respects FK constraints.
  */
-export class TestHarness<
+export class Supawright<
   Database extends GenericDatabase,
   Schema extends SchemaOf<Database>
 > {
+  private schemas: Schema[]
+  private tables: Tables
+  private readonly options?: SupawrightOptions<Database, Schema>
+  private dependencyGraph: DependencyGraph<Database, Schema>
   private _fixtures: Fixtures<Database, Schema> = new Fixtures()
 
   public static async new<
     Database extends GenericDatabase,
     Schema extends SchemaOf<Database>
-  >(schemas: [Schema, ...Schema[]], options?: HarnessOptions<Database, Schema>) {
+  >(schemas: [Schema, ...Schema[]], options?: SupawrightOptions<Database, Schema>) {
     if (!schemas.length) {
       throw new Error('No schemas provided')
     }
     const tables = await getSchemaTree(schemas, options?.database)
-    return new TestHarness(schemas, tables, options)
+    return new Supawright(schemas, tables, options)
   }
 
   private constructor(
-    private schemas: Schema[],
-    private tables: Tables,
-    private readonly options?: HarnessOptions<Database, Schema>
-  ) {}
+    schemas: Schema[],
+    tables: Tables,
+    options?: SupawrightOptions<Database, Schema>
+  ) {
+    this.schemas = schemas
+    this.tables = tables
+    this.options = options
+    this.dependencyGraph = this.createDependencyGraph()
+  }
 
   public record<Table extends TableIn<Database, Schema>>(
     fixture: Fixture<Database, Schema, Table>
@@ -106,10 +115,12 @@ export class TestHarness<
   }
 
   /**
-   * Refreshes the current object from the database and updates the harness' internal store
+   * Refreshes the current object from the database and updates the Supawright
+   * instance's internal store
+   * @param schema The schema name of the object to refresh
    * @param table The table name of the object to refresh
    * @param current The current object to refresh
-   * @param options What column to sort by (if the table doesn't have an ID column)
+   * @param by What column to search by
    * @returns The updated object
    */
   public async refresh<
@@ -152,11 +163,13 @@ export class TestHarness<
   /**
    * Search the database from the root tables and discover all records
    * associated with the fixtures.
+   *
+   * Discovered records are recorded against the Supawright instance for
+   * later use.
    */
   async discoverRecords() {
     const tablesToVisit = this.getRootTables()
     // For each of the root tables, discover records for all dependent tables.
-    const dependencyGraph = this.getDependencyGraph()
     while (tablesToVisit.length) {
       const rootTable = tablesToVisit.shift()
 
@@ -169,7 +182,8 @@ export class TestHarness<
         `Discovering records for dependents of ${rootTableSchema}.${rootTableName}`
       )
 
-      const dependentTables = dependencyGraph[`${rootTableSchema}.${rootTableName}`]
+      const dependentTables =
+        this.dependencyGraph[`${rootTableSchema}.${rootTableName}`]
       const rootTableFixtures = this.fixtures(rootTableSchema, rootTableName)
       for (const [dependentTable, dependencies] of Object.entries(dependentTables)) {
         log?.debug(`Discovering records for ${dependentTable}`)
@@ -227,12 +241,9 @@ export class TestHarness<
   public supabase(schema?: Schema) {
     schema = schema ?? (this.schemas[0] as Schema)
     const credentials = {
-      supabaseUrl:
-        this.options?.supabase?.supabaseUrl ??
-        process.env.SUPABASE_URL,
+      supabaseUrl: this.options?.supabase?.supabaseUrl ?? process.env.SUPABASE_URL,
       serviceRoleKey:
-        this.options?.supabase?.serviceRoleKey ??
-        process.env.SUPABASE_SERVICE_ROLE_KEY
+        this.options?.supabase?.serviceRoleKey ?? process.env.SUPABASE_SERVICE_ROLE_KEY
     }
     if (!credentials.supabaseUrl) {
       throw new Error('SUPABASE_URL is not set and no credentials provided')
@@ -248,7 +259,7 @@ export class TestHarness<
     )
   }
 
-  private getDependencyGraph(): DependencyGraph<Database, Schema> {
+  private createDependencyGraph(): DependencyGraph<Database, Schema> {
     const dependents = {} as DependencyGraph<Database, Schema>
     for (const schema of ['auth', ...this.schemas]) {
       for (const table of Object.keys(this.tables[schema]) as TableIn<
@@ -300,8 +311,6 @@ export class TestHarness<
     | `${Schema}.${TableIn<Database, Schema>}`
     | 'auth.users'
   )[] {
-    const dependencyGraph = this.getDependencyGraph()
-
     const visited = new Set<`${Schema}.${TableIn<Database, Schema>}`>()
     const recordTypeOrdering: `${Schema}.${TableIn<Database, Schema>}`[] = []
 
@@ -310,7 +319,7 @@ export class TestHarness<
         return
       }
       visited.add(table)
-      const dependencies = dependencyGraph[table]
+      const dependencies = this.dependencyGraph[table]
       for (const dependency of Object.keys(dependencies) as `${Schema}.${TableIn<
         Database,
         Schema
@@ -328,13 +337,14 @@ export class TestHarness<
   }
 
   /**
-   * Remove all records added to the database during the harness lifecycle.
+   * Remove all records added to the database during the Supawright instance's
+   * lifecycle.
    *
    * Handles dependencies between fixtures i.e. removes fixtures in an order
    * which respects foreign key constraints.
    */
   public async teardown() {
-    log?.debug('Tearing down test harness')
+    log?.debug('Tearing down Supawright')
     await this.discoverRecords()
     const recordTypeOrdering = this.createRecordTypeOrdering()
 
@@ -427,7 +437,7 @@ export class TestHarness<
 
   /**
    * Creates a new user using `supabase.auth.admin.createUser` and records
-   * it in the harness.
+   * it in Supawright.
    * @param attributes The user attributes usually passed to
    * `supabase.auth.admin.createUser`
    * @throws If the user could not be created
@@ -447,17 +457,42 @@ export class TestHarness<
 
   /**
    * Creates a new record in the database.
+   * @param schema The schema name of the record to create. Defaults to 'public'
    * @param table The table name of the record to create
    * @param data The data to create the record with
    * @returns The created record
    * @throws If the record could not be created
    * @throws If the record could not be found after creation
    */
+  public async create<
+    S extends 'public' extends Schema ? 'public' : never,
+    Table extends TableIn<Database, 'public'>
+  >(
+    table: S extends 'public' ? Table : never,
+    data?: S extends 'public' ? Partial<Insert<Database, S, Table>> : never
+  ): Promise<Select<Database, S, Table>>
   public async create<S extends Schema, Table extends TableIn<Database, S>>(
     schema: S,
     table: Table,
     data?: Partial<Insert<Database, S, Table>>
+  ): Promise<Select<Database, S, Table>>
+  public async create<S extends Schema, Table extends TableIn<Database, S>>(
+    schemaOrTable: S | Table,
+    tableOrData?: Table | Partial<Insert<Database, S, Table>>,
+    data?: Partial<Insert<Database, S, Table>>
   ): Promise<Select<Database, S, Table>> {
+    let schema: S
+    let table: Table
+
+    if (typeof tableOrData === 'string') {
+      schema = schemaOrTable as S
+      table = tableOrData
+    } else {
+      schema = 'public' as S
+      table = schemaOrTable as Table
+      data = tableOrData
+    }
+
     log?.debug(`create('${table}', '${JSON.stringify(data)}')`)
     const supabase = this.supabase(schema)
 
@@ -466,10 +501,10 @@ export class TestHarness<
       ...this.options?.generators
     }
 
-    if (this.options?.creators?.[schema]?.[table]) {
+    if (this.options?.overrides?.[schema]?.[table]) {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const newFixtures = await this.options.creators[schema]![table]!({
-        harness: this,
+      const newFixtures = await this.options.overrides[schema]![table]!({
+        supawright: this,
         data: data ?? {},
         supabase,
         generators: dataGenerators
@@ -484,17 +519,12 @@ export class TestHarness<
       return fixtureForTable.data as Select<Database, S, Table>
     }
 
-    // If there's already a record for this table, return it
-    const fixtures = this._fixtures.get(schema, table)
-    if (fixtures.length > 0) {
-      return fixtures[0]!.data
-    }
-
     if (!data) {
       data = {}
     }
     const row = this.tables[schema][table]
 
+    // Generate dummy data for all required columns
     for (const [column, type] of Object.entries(row.requiredColumns)) {
       if (data[column]) {
         continue
@@ -502,8 +532,16 @@ export class TestHarness<
       if (row.foreignKeys[column] && !row.foreignKeys[column].nullable) {
         const newTable = row.foreignKeys[column].table.name
         const newSchema = row.foreignKeys[column].table.schema
+        let newRecord: Select<Database, S, Table> | undefined
 
-        const newRecord = await this.create(newSchema as Schema, newTable, {})
+        // If there's already a record for this table, use it.
+        const fixtures = this._fixtures.get(schema, table)
+        if (fixtures.length > 0) {
+          newRecord = fixtures[0].data
+        } else {
+          newRecord = await this.create(newSchema as Schema, newTable, {})
+        }
+
         data[column as keyof typeof data] =
           newRecord[row.foreignKeys[column].foreignColumnName as keyof typeof newRecord]
       } else if (!row.foreignKeys[column]) {
