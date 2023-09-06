@@ -7,8 +7,8 @@
   "module": "dist/index.mjs",
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts",
-    "lint": "tsc && prettier --check src",
-    "format": "prettier --write src",
+    "lint": "tsc && prettier --check ./**/*.{ts,js,json}",
+    "format": "prettier --write ./**/*.{ts,js,json}",
     "test": "playwright test"
   },
   "devDependencies": {

@@ -125,7 +125,7 @@ test('dependencies are not created if passed in', async ({ supawright }) => {
   expect(parents?.[0].id).toBe(parent.id)
 })
 
-test('dependency fixtures are reused', async ({supawright}) => {
+test('dependency fixtures are reused', async ({ supawright }) => {
   await supawright.create('create_recursive_grandchild_2')
 
   const { data, error } = await supawright
