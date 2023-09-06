@@ -45,9 +45,20 @@ export async function getSchemaTree(schemas: string[], config?: Configuration) {
                 tc.table_name, 
                 kcu.column_name, 
                 tc.constraint_type = 'PRIMARY KEY' as is_primary_key,
-                ccu.table_schema as foreign_table_schema,
-                ccu.table_name as foreign_table_name,
-                ccu.column_name as foreign_column_name 
+                -- Only show foreign key information for foreign keys
+                -- Otherwise, we'll get duplicate rows for primary keys
+                case
+                  when tc.constraint_type = 'FOREIGN KEY'
+                    then ccu.table_schema 
+                end as foreign_table_schema,
+                case
+                  when tc.constraint_type = 'FOREIGN KEY'
+                    then ccu.table_name 
+                end as foreign_table_name,
+                case
+                  when tc.constraint_type = 'FOREIGN KEY'
+                    then ccu.column_name 
+                end as foreign_column_name
             from information_schema.table_constraints as tc 
                 left join information_schema.key_column_usage as kcu
                     on tc.constraint_name = kcu.constraint_name
@@ -84,7 +95,7 @@ export async function getSchemaTree(schemas: string[], config?: Configuration) {
         table: row[1] as string,
         column: row[2] as string,
         nullable: row[3] === 'YES',
-        hasDefault: !!row[4],
+        hasDefault: !!row[4] || row[5] === 'YES',
         type: row[6] as string,
         foreignTableSchema: row[7] as string,
         foreignTableName: row[8] as string,
@@ -123,9 +134,7 @@ export async function getSchemaTree(schemas: string[], config?: Configuration) {
         }
       }
 
-      // If the row is a primary key, the foreign table is the same as the current table,
-      // creating a circular reference. We don't want to add this to the foreign keys.
-      if (row.foreignTableSchema && !row.isPrimaryKey) {
+      if (row.foreignTableSchema) {
         if (!tables[row.foreignTableSchema]) {
           tables[row.foreignTableSchema] = {}
         }
@@ -145,7 +154,7 @@ export async function getSchemaTree(schemas: string[], config?: Configuration) {
         }
       }
 
-      if (!row.nullable) {
+      if (!row.nullable && !row.hasDefault) {
         tables[row.schema][row.table].requiredColumns[row.column] = row.type
       }
 

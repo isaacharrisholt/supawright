@@ -16,6 +16,10 @@ import type {
 import { createSupabaseTestClient, log } from './utils'
 import type { Configuration as PostgresConfig } from 'ts-postgres'
 
+const DEFAULT_SUPABASE_URL = 'http://localhost:54321'
+const DEFAULT_SUPABASE_SERVICE_ROLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+
 type Generator<Database extends GenericDatabase, Schema extends SchemaOf<Database>> =
   | (() => unknown)
   // TODO: figure out better typing for `column`
@@ -241,17 +245,14 @@ export class Supawright<
   public supabase(schema?: Schema) {
     schema = schema ?? (this.schemas[0] as Schema)
     const credentials = {
-      supabaseUrl: this.options?.supabase?.supabaseUrl ?? process.env.SUPABASE_URL,
+      supabaseUrl:
+        this.options?.supabase?.supabaseUrl ??
+        process.env.SUPABASE_URL ??
+        DEFAULT_SUPABASE_URL,
       serviceRoleKey:
-        this.options?.supabase?.serviceRoleKey ?? process.env.SUPABASE_SERVICE_ROLE_KEY
-    }
-    if (!credentials.supabaseUrl) {
-      throw new Error('SUPABASE_URL is not set and no credentials provided')
-    }
-    if (!credentials.serviceRoleKey) {
-      throw new Error(
-        'SUPABASE_SERVICE_ROLE_KEY is not set and no credentials provided'
-      )
+        this.options?.supabase?.serviceRoleKey ??
+        process.env.SUPABASE_SERVICE_ROLE_KEY ??
+        DEFAULT_SUPABASE_SERVICE_ROLE_KEY
     }
     return createSupabaseTestClient<Database, Schema>(
       credentials as SupabaseClientCredentials,
@@ -261,7 +262,11 @@ export class Supawright<
 
   private createDependencyGraph(): DependencyGraph<Database, Schema> {
     const dependents = {} as DependencyGraph<Database, Schema>
-    for (const schema of ['auth', ...this.schemas]) {
+    const schemas = [...this.schemas]
+    if ('auth' in this.tables) {
+      schemas.unshift('auth' as Schema)
+    }
+    for (const schema of schemas) {
       for (const table of Object.keys(this.tables[schema]) as TableIn<
         Database,
         Schema
@@ -531,15 +536,19 @@ export class Supawright<
       }
       if (row.foreignKeys[column] && !row.foreignKeys[column].nullable) {
         const newTable = row.foreignKeys[column].table.name
-        const newSchema = row.foreignKeys[column].table.schema
+        const newSchema = row.foreignKeys[column].table.schema as Schema
         let newRecord: Select<Database, S, Table> | undefined
 
         // If there's already a record for this table, use it.
-        const fixtures = this._fixtures.get(schema, table)
+        log.debug(`Looking for existing record for ${newSchema}.${newTable}`)
+        log.debug(this._fixtures)
+        const fixtures = this._fixtures.get(newSchema, newTable)
         if (fixtures.length > 0) {
+          log.debug(`Found ${fixtures.length} existing records`)
           newRecord = fixtures[0].data
         } else {
-          newRecord = await this.create(newSchema as Schema, newTable, {})
+          log.debug('No existing records found, creating new record')
+          newRecord = await this.create(newSchema, newTable, {})
         }
 
         data[column as keyof typeof data] =
@@ -573,6 +582,7 @@ export class Supawright<
     }
 
     data = insertData as typeof data
+    log.debug(`Recording ${schema}.${table}`)
     this.record({ schema, table, data })
 
     return data

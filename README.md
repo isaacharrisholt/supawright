@@ -26,6 +26,16 @@ line in your generated Supabase types (typically `database.ts`):
 + export type Database = {
 ```
 
+I recommend setting up a `make` target (or whichever build tool you use) to
+automatically make this change for you, e.g.
+
+```make
+types:
+    pnpm supabase gen types typescript --local | \
+    sed 's/export interface Database {/export type Database = {/' \
+    > src/types/database.ts
+```
+
 Then, create a test file, e.g. `can-login.test.ts`, and create a test function
 with the `withSupawright` function:
 
