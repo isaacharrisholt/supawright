@@ -242,7 +242,7 @@ export class Supawright<
    * @param schema The schema to use for the client
    * @returns A supabase client for the given schema
    */
-  public supabase(schema?: Schema) {
+  public supabase(schema?: Schema): SupabaseClient<Database, Schema> {
     schema = schema ?? (this.schemas[0] as Schema)
     const credentials = {
       supabaseUrl:

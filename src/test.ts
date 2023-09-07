@@ -1,4 +1,11 @@
 import { test } from '@playwright/test'
+import type {
+  PlaywrightTestArgs,
+  PlaywrightTestOptions,
+  PlaywrightWorkerArgs,
+  PlaywrightWorkerOptions,
+  TestType
+} from '@playwright/test'
 import { SupawrightOptions, Supawright } from './harness'
 import { GenericDatabase, SchemaOf } from './types'
 
@@ -11,7 +18,16 @@ import { GenericDatabase, SchemaOf } from './types'
 export function withSupawright<
   Database extends GenericDatabase,
   Schema extends SchemaOf<Database>
->(schemas: [Schema, ...Schema[]], options?: SupawrightOptions<Database, Schema>) {
+>(
+  schemas: [Schema, ...Schema[]],
+  options?: SupawrightOptions<Database, Schema>
+): TestType<
+  PlaywrightTestArgs &
+    PlaywrightTestOptions & {
+      supawright: Supawright<Database, Schema>
+    },
+  PlaywrightWorkerArgs & PlaywrightWorkerOptions
+> {
   return test.extend<{
     supawright: Supawright<Database, Schema>
   }>({
