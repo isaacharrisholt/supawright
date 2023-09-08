@@ -23,16 +23,15 @@ export function withSupawright<
   options?: SupawrightOptions<Database, Schema>
 ): TestType<
   PlaywrightTestArgs &
-    PlaywrightTestOptions & {
-      supawright: Supawright<Database, Schema>
-    },
+  PlaywrightTestOptions & {
+    supawright: Supawright<Database, Schema>
+  },
   PlaywrightWorkerArgs & PlaywrightWorkerOptions
 > {
   return test.extend<{
     supawright: Supawright<Database, Schema>
   }>({
-    // Have to destructure here or users get an error
-    supawright: async ({ page }, use) => {
+    supawright: async ({ }, use) => {
       const supawright = await Supawright.new(schemas, options)
       await use(supawright)
       await supawright.teardown()
