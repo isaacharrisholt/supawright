@@ -31,7 +31,8 @@ export function withSupawright<
   return test.extend<{
     supawright: Supawright<Database, Schema>
   }>({
-    supawright: async ({}, use) => {
+    // Have to destructure here or users get an error
+    supawright: async ({ page }, use) => {
       const supawright = await Supawright.new(schemas, options)
       await use(supawright)
       await supawright.teardown()
