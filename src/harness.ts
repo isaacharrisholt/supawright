@@ -461,8 +461,12 @@ export class Supawright<
    * `supabase.auth.admin.createUser`
    * @throws If the user could not be created
    */
-  public async createUser(attributes: AdminUserAttributes): Promise<User> {
-    const { data, error } = await this.supabase().auth.admin.createUser(attributes)
+  public async createUser(attributes?: AdminUserAttributes): Promise<User> {
+    const { data, error } = await this.supabase().auth.admin.createUser({
+      email: faker.internet.email(),
+      password: faker.internet.password(),
+      ...attributes
+    })
     if (error) {
       log.error('Error creating user', { error, attributes })
       throw new Error('Error creating user: ' + error.message)
@@ -521,11 +525,7 @@ export class Supawright<
     }
     
     if (schema === 'auth' && table === 'users' && !this.options?.overrides?.auth?.users) {
-      return await this.createUser({
-        email: faker.internet.email(),
-        password: faker.internet.password(),
-        ...data
-      }) as unknown as Select<Database, S, Table>
+      return await this.createUser(data as AdminUserAttributes) as unknown as Select<Database, S, Table>
     }
 
     const supabase = this.supabase(schema)

@@ -222,6 +222,62 @@ export type Database = {
           }
         ]
       }
+      teardown_auth_dependent: {
+        Row: {
+          id: number
+          user_id: string
+        }
+        Insert: {
+          id?: never
+          user_id: string
+        }
+        Update: {
+          id?: never
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teardown_auth_dependent_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      teardown_child: {
+        Row: {
+          id: string
+          parent_id: string
+        }
+        Insert: {
+          id: string
+          parent_id: string
+        }
+        Update: {
+          id?: string
+          parent_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teardown_child_parent_id_fkey"
+            columns: ["parent_id"]
+            referencedRelation: "teardown_parent"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      teardown_parent: {
+        Row: {
+          id: string
+        }
+        Insert: {
+          id: string
+        }
+        Update: {
+          id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
