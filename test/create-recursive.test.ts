@@ -156,3 +156,11 @@ test('dependency fixtures are reused', async ({ supawright }) => {
   // that the grandparent fixture is reused
   expect(parent?.[0].required_foreign_key).toBe(data?.[0].required_foreign_key_1)
 })
+
+test('auth users are recursively created', async ({ supawright }) => {
+  const record = await supawright.create('create_recursive_requires_auth_user')
+
+  const { data: userFetch, error } = await supawright.supabase().auth.admin.getUserById(record.user_id)
+  expect(error).toBeNull()
+  expect(userFetch.user).toBeTruthy()
+})

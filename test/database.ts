@@ -73,16 +73,16 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'create_recursive_child_1_optional_foreign_key_fkey'
-            columns: ['optional_foreign_key']
-            referencedRelation: 'create_recursive_parent_2'
-            referencedColumns: ['id']
+            foreignKeyName: "create_recursive_child_1_optional_foreign_key_fkey"
+            columns: ["optional_foreign_key"]
+            referencedRelation: "create_recursive_parent_2"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'create_recursive_child_1_required_foreign_key_fkey'
-            columns: ['required_foreign_key']
-            referencedRelation: 'create_recursive_parent_1'
-            referencedColumns: ['id']
+            foreignKeyName: "create_recursive_child_1_required_foreign_key_fkey"
+            columns: ["required_foreign_key"]
+            referencedRelation: "create_recursive_parent_1"
+            referencedColumns: ["id"]
           }
         ]
       }
@@ -104,16 +104,16 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'create_recursive_child_2_required_foreign_key_1_fkey'
-            columns: ['required_foreign_key_1']
-            referencedRelation: 'create_recursive_parent_1'
-            referencedColumns: ['id']
+            foreignKeyName: "create_recursive_child_2_required_foreign_key_1_fkey"
+            columns: ["required_foreign_key_1"]
+            referencedRelation: "create_recursive_parent_1"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'create_recursive_child_2_required_foreign_key_2_fkey'
-            columns: ['required_foreign_key_2']
-            referencedRelation: 'create_recursive_parent_2'
-            referencedColumns: ['id']
+            foreignKeyName: "create_recursive_child_2_required_foreign_key_2_fkey"
+            columns: ["required_foreign_key_2"]
+            referencedRelation: "create_recursive_parent_2"
+            referencedColumns: ["id"]
           }
         ]
       }
@@ -132,10 +132,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'create_recursive_grandchild_1_required_foreign_key_fkey'
-            columns: ['required_foreign_key']
-            referencedRelation: 'create_recursive_child_1'
-            referencedColumns: ['id']
+            foreignKeyName: "create_recursive_grandchild_1_required_foreign_key_fkey"
+            columns: ["required_foreign_key"]
+            referencedRelation: "create_recursive_child_1"
+            referencedColumns: ["id"]
           }
         ]
       }
@@ -157,16 +157,16 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'create_recursive_grandchild_2_required_foreign_key_1_fkey'
-            columns: ['required_foreign_key_1']
-            referencedRelation: 'create_recursive_parent_1'
-            referencedColumns: ['id']
+            foreignKeyName: "create_recursive_grandchild_2_required_foreign_key_1_fkey"
+            columns: ["required_foreign_key_1"]
+            referencedRelation: "create_recursive_parent_1"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'create_recursive_grandchild_2_required_foreign_key_2_fkey'
-            columns: ['required_foreign_key_2']
-            referencedRelation: 'create_recursive_child_1'
-            referencedColumns: ['id']
+            foreignKeyName: "create_recursive_grandchild_2_required_foreign_key_2_fkey"
+            columns: ["required_foreign_key_2"]
+            referencedRelation: "create_recursive_child_1"
+            referencedColumns: ["id"]
           }
         ]
       }
@@ -199,6 +199,28 @@ export type Database = {
           id?: never
         }
         Relationships: []
+      }
+      create_recursive_requires_auth_user: {
+        Row: {
+          id: number
+          user_id: string
+        }
+        Insert: {
+          id?: number
+          user_id: string
+        }
+        Update: {
+          id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "create_recursive_requires_auth_user_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {
@@ -252,10 +274,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'buckets_owner_fkey'
-            columns: ['owner']
-            referencedRelation: 'users'
-            referencedColumns: ['id']
+            foreignKeyName: "buckets_owner_fkey"
+            columns: ["owner"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           }
         ]
       }
@@ -319,10 +341,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'objects_bucketId_fkey'
-            columns: ['bucket_id']
-            referencedRelation: 'buckets'
-            referencedColumns: ['id']
+            foreignKeyName: "objects_bucketId_fkey"
+            columns: ["bucket_id"]
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
           }
         ]
       }
@@ -394,3 +416,4 @@ export type Database = {
     }
   }
 }
+

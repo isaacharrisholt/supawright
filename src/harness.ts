@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker'
-import { SupabaseClient, type AdminUserAttributes } from '@supabase/supabase-js'
+import { SupabaseClient, type AdminUserAttributes, User } from '@supabase/supabase-js'
 import { Fixtures } from './fixtures'
 import { Tables, fakeDataGenerators, getSchemaTree } from './tree'
 import type {
@@ -41,6 +41,16 @@ export type Creator<
   generators: Generators<Database, Schema>
 }) => Promise<Fixture<Database, Schema | 'auth', TableIn<Database, Schema> | 'users'>[]>
 
+export type UserCreator<
+  Database extends GenericDatabase,
+  Schema extends SchemaOf<Database>,
+> = (params: {
+  supawright: Supawright<Database, Schema>
+  data: AdminUserAttributes,
+  supabase: SupabaseClient<Database, Schema>
+  generators: Generators<Database, Schema>
+}) => Promise<Fixture<Database, Schema | 'auth', TableIn<Database, Schema> | 'users'>[]>
+
 export type SupawrightOptions<
   Database extends GenericDatabase,
   Schema extends SchemaOf<Database>
@@ -49,6 +59,10 @@ export type SupawrightOptions<
   overrides?: {
     [S in Schema]?: {
       [Table in TableIn<Database, S>]?: Creator<Database, Schema, Table>
+    }
+  } & {
+    auth?: {
+      users?: UserCreator<Database, Schema>
     }
   }
   supabase?: SupabaseClientCredentials
@@ -447,7 +461,7 @@ export class Supawright<
    * `supabase.auth.admin.createUser`
    * @throws If the user could not be created
    */
-  public async createUser(attributes: AdminUserAttributes) {
+  public async createUser(attributes: AdminUserAttributes): Promise<User> {
     const { data, error } = await this.supabase().auth.admin.createUser(attributes)
     if (error) {
       log.error('Error creating user', { error, attributes })
@@ -456,8 +470,9 @@ export class Supawright<
     this.record({
       schema: 'auth',
       table: 'users',
-      data: data as unknown as Select<Database, 'auth', 'users'>
+      data: data.user as unknown as Select<Database, 'auth', 'users'>
     })
+    return data.user
   }
 
   /**
@@ -499,13 +514,21 @@ export class Supawright<
     }
 
     log?.debug(`create('${table}', '${JSON.stringify(data)}')`)
-    const supabase = this.supabase(schema)
 
     const dataGenerators: Generators<Database, Schema> = {
       ...fakeDataGenerators,
       ...this.options?.generators
     }
+    
+    if (schema === 'auth' && table === 'users' && !this.options?.overrides?.auth?.users) {
+      return await this.createUser({
+        email: faker.internet.email(),
+        password: faker.internet.password(),
+        ...data
+      }) as unknown as Select<Database, S, Table>
+    }
 
+    const supabase = this.supabase(schema)
     if (this.options?.overrides?.[schema]?.[table]) {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const newFixtures = await this.options.overrides[schema]![table]!({
