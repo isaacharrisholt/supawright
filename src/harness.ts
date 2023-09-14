@@ -187,6 +187,7 @@ export class Supawright<
    */
   async discoverRecords() {
     const tablesToVisit = this.getRootTables()
+    log?.debug('Starting record discovery', { tablesToVisit })
     // For each of the root tables, discover records for all dependent tables.
     while (tablesToVisit.length) {
       const rootTable = tablesToVisit.shift()
@@ -366,6 +367,7 @@ export class Supawright<
     log?.debug('Tearing down Supawright')
     await this.discoverRecords()
     const recordTypeOrdering = this.createRecordTypeOrdering()
+    log?.debug('Deleting records in order', { recordTypeOrdering })
 
     for (const qualifiedTable of recordTypeOrdering) {
       if (qualifiedTable === 'auth.users') {
