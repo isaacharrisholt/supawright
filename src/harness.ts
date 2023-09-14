@@ -205,7 +205,6 @@ export class Supawright<
         this.dependencyGraph[`${rootTableSchema}.${rootTableName}`]
       const rootTableFixtures = this.fixtures(rootTableSchema, rootTableName)
       for (const [dependentTable, dependencies] of Object.entries(dependentTables)) {
-        log?.debug(`Discovering records for ${dependentTable}`)
         const [dependentTableSchema, dependentTableName] = dependentTable.split(
           '.'
         ) as [Schema, TableIn<Database, Schema>]
@@ -223,6 +222,7 @@ export class Supawright<
           )
         }
 
+        log?.debug(`Discovering records for ${dependentTable}`, { query })
         const { data, error } = await query
 
         if (error) {
