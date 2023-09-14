@@ -43,10 +43,10 @@ export type Creator<
 
 export type UserCreator<
   Database extends GenericDatabase,
-  Schema extends SchemaOf<Database>,
+  Schema extends SchemaOf<Database>
 > = (params: {
   supawright: Supawright<Database, Schema>
-  data: AdminUserAttributes,
+  data: AdminUserAttributes
   supabase: SupabaseClient<Database, Schema>
   generators: Generators<Database, Schema>
 }) => Promise<Fixture<Database, Schema | 'auth', TableIn<Database, Schema> | 'users'>[]>
@@ -211,18 +211,20 @@ export class Supawright<
         const supabase = this.supabase(dependentTableSchema)
         let query = supabase.from(dependentTableName).select()
 
-        for (const dependency of dependencies as any[]) {
-          query = query.or(
-            `${dependency.column}.in.(${rootTableFixtures
-              .map(
-                (fixture) =>
-                  fixture.data[dependency.references as keyof typeof fixture.data]
-              )
-              .join(',')})`
-          )
+        const filterString = (dependencies as any[]).map((dependency) => {
+          return `${dependency.column}.in.(${rootTableFixtures
+            .map(
+              (fixture) =>
+                fixture.data[dependency.references as keyof typeof fixture.data]
+            )
+            .join(',')})`
+        }).join(', ')
+
+        if (filterString) {
+          query = query.or(filterString)
         }
 
-        log?.debug(`Discovering records for ${dependentTable}`, { query })
+        log?.debug(`Discovering records for ${dependentTable}`)
         const { data, error } = await query
 
         if (error) {
@@ -525,9 +527,17 @@ export class Supawright<
       ...fakeDataGenerators,
       ...this.options?.generators
     }
-    
-    if (schema === 'auth' && table === 'users' && !this.options?.overrides?.auth?.users) {
-      return await this.createUser(data as AdminUserAttributes) as unknown as Select<Database, S, Table>
+
+    if (
+      schema === 'auth' &&
+      table === 'users' &&
+      !this.options?.overrides?.auth?.users
+    ) {
+      return (await this.createUser(data as AdminUserAttributes)) as unknown as Select<
+        Database,
+        S,
+        Table
+      >
     }
 
     const supabase = this.supabase(schema)
