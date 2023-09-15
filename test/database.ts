@@ -32,6 +32,56 @@ export type Database = {
       [_ in never]: never
     }
   }
+  other: {
+    Tables: {
+      other_schemas_local_child: {
+        Row: {
+          id: number
+          parent_id: number
+        }
+        Insert: {
+          id?: never
+          parent_id: number
+        }
+        Update: {
+          id?: never
+          parent_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "other_schemas_local_child_parent_id_fkey"
+            columns: ["parent_id"]
+            referencedRelation: "other_schemas_parent"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      other_schemas_parent: {
+        Row: {
+          id: number
+        }
+        Insert: {
+          id?: never
+        }
+        Update: {
+          id?: never
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       create_fields: {
@@ -218,6 +268,28 @@ export type Database = {
             foreignKeyName: "create_recursive_requires_auth_user_user_id_fkey"
             columns: ["user_id"]
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      other_schemas_foreign_child: {
+        Row: {
+          id: number
+          parent_id: number
+        }
+        Insert: {
+          id?: never
+          parent_id: number
+        }
+        Update: {
+          id?: never
+          parent_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "other_schemas_foreign_child_parent_id_fkey"
+            columns: ["parent_id"]
+            referencedRelation: "other_schemas_parent"
             referencedColumns: ["id"]
           }
         ]
