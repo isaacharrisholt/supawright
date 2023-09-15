@@ -119,51 +119,49 @@ export async function getSchemaTree(schemas: string[], config?: Configuration) {
 
   const tables: Tables = {}
 
-  for (const schema of schemas) {
-    for (const row of rows) {
-      if (!tables[schema]) {
-        tables[schema] = {}
+  for (const row of rows) {
+    if (!tables[row.schema]) {
+      tables[row.schema] = {}
+    }
+    if (!tables[row.schema][row.table]) {
+      tables[row.schema][row.table] = {
+        name: row.table,
+        schema: row.schema,
+        requiredColumns: {},
+        foreignKeys: {},
+        primaryKeys: []
       }
-      if (!tables[schema][row.table]) {
-        tables[schema][row.table] = {
-          name: row.table,
-          schema,
+    }
+
+    if (row.foreignTableSchema) {
+      if (!tables[row.foreignTableSchema]) {
+        tables[row.foreignTableSchema] = {}
+      }
+      if (!tables[row.foreignTableSchema][row.foreignTableName]) {
+        tables[row.foreignTableSchema][row.foreignTableName] = {
+          name: row.foreignTableName,
+          schema: row.foreignTableSchema,
           requiredColumns: {},
           foreignKeys: {},
           primaryKeys: []
         }
       }
-
-      if (row.foreignTableSchema) {
-        if (!tables[row.foreignTableSchema]) {
-          tables[row.foreignTableSchema] = {}
-        }
-        if (!tables[row.foreignTableSchema][row.foreignTableName]) {
-          tables[row.foreignTableSchema][row.foreignTableName] = {
-            name: row.foreignTableName,
-            schema: row.foreignTableSchema,
-            requiredColumns: {},
-            foreignKeys: {},
-            primaryKeys: []
-          }
-        }
-        tables[row.schema][row.table].foreignKeys[row.column] = {
-          table: tables[row.foreignTableSchema][row.foreignTableName],
-          foreignColumnName: row.foreignColumnName,
-          nullable: row.nullable
-        }
+      tables[row.schema][row.table].foreignKeys[row.column] = {
+        table: tables[row.foreignTableSchema][row.foreignTableName],
+        foreignColumnName: row.foreignColumnName,
+        nullable: row.nullable
       }
+    }
 
-      if (!row.nullable && !row.hasDefault) {
-        tables[row.schema][row.table].requiredColumns[row.column] = row.type
-      }
+    if (!row.nullable && !row.hasDefault) {
+      tables[row.schema][row.table].requiredColumns[row.column] = row.type
+    }
 
-      if (
-        row.isPrimaryKey &&
-        !tables[row.schema][row.table].primaryKeys.includes(row.column)
-      ) {
-        tables[row.schema][row.table].primaryKeys.push(row.column)
-      }
+    if (
+      row.isPrimaryKey &&
+      !tables[row.schema][row.table].primaryKeys.includes(row.column)
+    ) {
+      tables[row.schema][row.table].primaryKeys.push(row.column)
     }
   }
 

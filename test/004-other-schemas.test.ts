@@ -18,7 +18,7 @@ test('can create parent records across schema boundaries', async ({ supawright }
   await supawright.create('public', 'other_schemas_foreign_child')
 
   const { data: parents, error } = await supawright
-    .supabase()
+    .supabase('other')
     .from('other_schemas_parent')
     .select()
 
