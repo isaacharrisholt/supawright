@@ -133,6 +133,9 @@ test('can login', async ({ supawright }) => {
 })
 ```
 
+Note: the `.supabase()` method of the `Supawright` object takes an optional
+schema name to create a Supabase client in the chosen schema.
+
 ### Overrides
 
 If you have custom functions you wish to use to generate fake data or create
