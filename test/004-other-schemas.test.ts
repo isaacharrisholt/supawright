@@ -35,7 +35,7 @@ test('can discover child records across schema boundaries', async ({ supawright 
     .select()
     .eq('parent_id', parent.id)
 
-    expect(childSelectError).toBeNull()
+  expect(childSelectError).toBeNull()
 
   await supawright.teardown()
 

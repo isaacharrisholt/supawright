@@ -211,14 +211,16 @@ export class Supawright<
         const supabase = this.supabase(dependentTableSchema)
         let query = supabase.from(dependentTableName).select()
 
-        const filterString = (dependencies as any[]).map((dependency) => {
-          return `${dependency.column}.in.(${rootTableFixtures
-            .map(
-              (fixture) =>
-                fixture.data[dependency.references as keyof typeof fixture.data]
-            )
-            .join(',')})`
-        }).join(', ')
+        const filterString = (dependencies as any[])
+          .map((dependency) => {
+            return `${dependency.column}.in.(${rootTableFixtures
+              .map(
+                (fixture) =>
+                  fixture.data[dependency.references as keyof typeof fixture.data]
+              )
+              .join(',')})`
+          })
+          .join(', ')
 
         if (filterString) {
           query = query.or(filterString)

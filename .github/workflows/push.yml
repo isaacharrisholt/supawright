@@ -41,7 +41,7 @@ jobs:
           version: 1.93.0
       - name: Start Supabase
         run: |
-          pnpm supabase start -x gotrue \
+          pnpm supabase start \
             -x realtime \
             -x storage-api \
             -x imgproxy \

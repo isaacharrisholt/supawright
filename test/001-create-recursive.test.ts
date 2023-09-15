@@ -160,7 +160,9 @@ test('dependency fixtures are reused', async ({ supawright }) => {
 test('auth users are recursively created', async ({ supawright }) => {
   const record = await supawright.create('create_recursive_requires_auth_user')
 
-  const { data: userFetch, error } = await supawright.supabase().auth.admin.getUserById(record.user_id)
+  const { data: userFetch, error } = await supawright
+    .supabase()
+    .auth.admin.getUserById(record.user_id)
   expect(error).toBeNull()
   expect(userFetch.user).toBeTruthy()
 })
