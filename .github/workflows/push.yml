@@ -1,0 +1,58 @@
+name: Lint and test
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8.6.9
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 16.x
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm run lint
+      - name: Build
+        run: pnpm run build
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8.6.9
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 16.x
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: 1.93.0
+      - name: Start Supabase
+        run: |
+          pnpm supabase start \
+            -x realtime \
+            -x storage-api \
+            -x imgproxy \
+            -x inbucket \
+            -x pgadmin-schema-diff \
+            -x migra \
+            -x postgres-meta \
+            -x studio \
+            -x edge-runtime \
+            -x logflare \
+            -x vector \
+            -x pgbouncer
+      - name: Test
+        run: pnpm run test
