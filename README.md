@@ -68,7 +68,7 @@ create table public."user" (
 
 create table public.session (
     id uuid primary key default uuid_generate_v4(),
-    user_id uuid not null references public.users(id),
+    user_id uuid not null references public."user"(id),
     token text,
     created_at timestamp with time zone not null default now()
 );
@@ -204,7 +204,7 @@ const test = withSupawright<Database, 'public' | 'other'>(['public', 'other'], {
   },
   database: {
     host: 'localhost',
-    port: 5432,
+    port: 54322,
     user: 'me',
     password: 'password',
     database: 'my-database'
