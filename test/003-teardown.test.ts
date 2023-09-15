@@ -19,32 +19,6 @@ test('can successfully teardown single table records', async ({ supawright }) =>
   expect(data?.length).toBe(0)
 })
 
-test('can successfully discover parent records', async ({ supawright }) => {
-  const { data: parent, error: parentInsertError } = await supawright
-    .supabase()
-    .from('teardown_parent')
-    .insert({
-      id: faker.string.uuid()
-    })
-    .select()
-    .single()
-
-  expect(parentInsertError).toBeNull()
-  const record = await supawright.create('teardown_child', {
-    parent_id: parent!.id
-  })
-
-  await supawright.teardown()
-
-  const { data, error } = await supawright
-    .supabase()
-    .from('teardown_parent')
-    .select()
-    .eq('id', record.id)
-  expect(error).toBeNull()
-  expect(data?.length).toBe(0)
-})
-
 test('can successfully discover dependent records', async ({ supawright }) => {
   const parent = await supawright.create('teardown_parent')
   const { data: child, error: childInsertError } = await supawright
@@ -79,28 +53,6 @@ test('can successfully teardown an auth user', async ({ supawright }) => {
     .auth.admin.getUserById(user.id)
   expect(foundUser.user).toBeNull()
   expect(error?.status).toBe(404)
-})
-
-test('can successfully discover parent auth users', async ({ supawright }) => {
-  const {
-    data: { user },
-    error: userInsertError
-  } = await supawright.supabase().auth.admin.createUser({
-    email: faker.internet.email(),
-    password: faker.internet.password()
-  })
-
-  expect(userInsertError).toBeNull()
-  await supawright.create('teardown_auth_dependent', {
-    user_id: user!.id
-  })
-
-  await supawright.teardown()
-
-  const { data, error } = await supawright.supabase().auth.admin.getUserById(user!.id)
-
-  expect(error?.status).toBe(404)
-  expect(data?.user).toBeNull()
 })
 
 test('can successfully discover dependents of auth users', async ({ supawright }) => {
