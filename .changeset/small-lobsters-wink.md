@@ -1,0 +1,5 @@
+---
+'supawright': minor
+---
+
+Supawright release
