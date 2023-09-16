@@ -86,7 +86,7 @@ test('can login', async ({ supawright }) => {
 })
 ```
 
-You can optional pass a `data` object as the second argument to the `create`
+You can optionally pass a `data` object as the second argument to the `create`
 function to override the fake data that is generated. If you pass in data
 for a foreign key column, Supawright will not create a record for that table.
 
@@ -139,7 +139,7 @@ schema name to create a Supabase client in the chosen schema.
 ### Overrides
 
 If you have custom functions you wish to use to generate fake data or create
-records, you can pass optional config as the second argument to the `supawright`
+records, you can pass optional config as the second argument to the `withSupawright`
 function.
 
 The `generators` object is a record of Postgres types to functions that return
@@ -158,7 +158,7 @@ This is useful if you use a database trigger to populate certain tables and
 need to run custom code to activate the trigger.
 
 ```ts
-const test = supawright<
+const test = withSupawright<
     Database,
     'public' | 'other',
 >(
