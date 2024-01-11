@@ -36,6 +36,10 @@ types:
     > src/types/database.ts
 ```
 
+> Note: there's currently
+> [an open PR](https://github.com/supabase/postgres-meta/pull/687) to change
+> this. Give it a +1?
+
 Then, create a test file, e.g. `can-login.test.ts`, and create a test function
 with the `withSupawright` function:
 
