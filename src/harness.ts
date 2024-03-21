@@ -624,9 +624,9 @@ export class Supawright<
       log?.error('Error inserting data', { error, table })
       throw new Error(
         `Error inserting data into ${table}: ` +
-        error.message +
-        '\nData: ' +
-        JSON.stringify(data)
+          error.message +
+          '\nData: ' +
+          JSON.stringify(data)
       )
     }
 
