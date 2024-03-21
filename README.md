@@ -21,6 +21,8 @@ Unfortunately, Supabase's generated TypeScript types generate an interface,
 whereas for type constraints, we need a type. So, first change the following
 line in your generated Supabase types (typically `database.ts`):
 
+> Note: this has now been changed, but will still apply to old Supabase versions.
+
 ```diff
 - export interface Database {
 + export type Database = {
@@ -35,10 +37,6 @@ types:
     sed 's/export interface Database {/export type Database = {/' \
     > src/types/database.ts
 ```
-
-> Note: there's currently
-> [an open PR](https://github.com/supabase/postgres-meta/pull/687) to change
-> this. Give it a +1?
 
 Then, create a test file, e.g. `can-login.test.ts`, and create a test function
 with the `withSupawright` function:
@@ -225,9 +223,9 @@ const test = withSupawright<Database, 'public' | 'other'>(['public', 'other'], {
 
 ## TODO
 
-- [ ] Automatically infer allowed enum values from database
+- [x] Automatically infer allowed enum values from database
 - [ ] Automatically infer custom composite types from database
 - [ ] Fix up my janky typings
-- [ ] Come up with a way of using the `Database` type without having to modify
+- [x] Come up with a way of using the `Database` type without having to modify
       the generated Supabase types
   - This may involve convincing Supabase to change up their generated types
