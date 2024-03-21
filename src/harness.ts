@@ -556,6 +556,8 @@ export class Supawright<
     }
 
     const supabase = this.supabase(schema)
+    // See if there's a custom creator for this table,
+    // and call it if there is.
     if (this.options?.overrides?.[schema]?.[table]) {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const newFixtures = await this.options.overrides[schema]![table]!({
@@ -604,30 +606,11 @@ export class Supawright<
         data[column as keyof typeof data] =
           newRecord[row.foreignKeys[column].foreignColumnName as keyof typeof newRecord]
       } else if (!row.foreignKeys[column]) {
-        let generator: Generator<Database, Schema> | undefined
-        if (typeof type === 'string') {
-          // Regular type
-          generator = dataGenerators[type as keyof typeof dataGenerators]
-        } else {
-          // User-defined type
-          const enumType: Enum | undefined = this.enums[type.schema][type.name]
-          if (this.options?.generators?.['USER-DEFINED']) {
-            generator = this.options.generators['USER-DEFINED']
-          } else if (enumType) {
-            // Search for enum
-            generator = (_, __) =>
-              enumType.values[Math.floor(Math.random() * enumType.values.length)]
-          } else {
-            generator = dataGenerators['USER-DEFINED']
-          }
-        }
-        if (!generator) {
-          throw new Error(`No generator for type ${JSON.stringify(type)}`)
-        }
-        data[column as keyof typeof data] = generator(table, column) as any
-        if (column.includes('email')) {
-          data[column as keyof typeof data] = faker.internet.email() as any
-        }
+        data[column as keyof typeof data] = this.getGeneratedValueForType(
+          table,
+          column,
+          type
+        )
       }
     }
 
@@ -641,9 +624,9 @@ export class Supawright<
       log?.error('Error inserting data', { error, table })
       throw new Error(
         `Error inserting data into ${table}: ` +
-          error.message +
-          '\nData: ' +
-          JSON.stringify(data)
+        error.message +
+        '\nData: ' +
+        JSON.stringify(data)
       )
     }
 
@@ -652,5 +635,67 @@ export class Supawright<
     this.record({ schema, table, data })
 
     return data
+  }
+
+  /**
+   * Generate data for the column. First try the user-defined generators,
+   * then fall back to built-in generators. If the column is a USER-DEFINED
+   * enum, fall back to using a random enum value instead.
+   *
+   * `type` will be an object if it's a user-defined type, and a string
+   * otherwise.
+   */
+  private getGeneratedValueForType(
+    table: string,
+    column: string,
+    type: string | { schema: string; name: string }
+  ): any {
+    let val: any = null
+
+    if (typeof type === 'string') {
+      // Regular type
+      // Special case for email columns
+      if (
+        (type.includes('text') || type.includes('varchar')) &&
+        column.includes('email')
+      ) {
+        return faker.internet.email() as any
+      }
+
+      // Try user-defined generator if it exists, otherwise fall back to built-in
+      const userDefinedGenerator = this.options?.generators?.[type]
+      val = userDefinedGenerator?.(table, column)
+      if (val !== null && val !== undefined) {
+        return val
+      }
+
+      const builtInGenerator =
+        fakeDataGenerators[type as keyof typeof fakeDataGenerators]
+      val = builtInGenerator?.()
+      if (val !== null && val !== undefined) {
+        return val
+      }
+    } else {
+      // User-defined type
+      const enumType: Enum | undefined = this.enums[type.schema][type.name]
+      if (this.options?.generators?.['USER-DEFINED']) {
+        val = this.options.generators['USER-DEFINED'](table, column)
+        if (val !== null && val !== undefined) {
+          return val
+        }
+      }
+
+      if (enumType) {
+        // Search for enum
+        val = enumType.values[Math.floor(Math.random() * enumType.values.length)]
+        if (val !== null && val !== undefined) {
+          return val
+        }
+      }
+    }
+    if (!val) {
+      throw new Error(`No generator for type ${JSON.stringify(type)}`)
+    }
+    return val
   }
 }
