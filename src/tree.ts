@@ -34,7 +34,7 @@ export type Enum = {
   schema: string
   values: string[]
 }
-export type EnumValues = Record<string, Enum>
+export type EnumValues = Record<string, Record<string, Enum>>
 
 async function getClient(config?: Configuration) {
   return await connect({
@@ -68,6 +68,7 @@ export async function getEnums(schemas: string[], config?: Configuration) {
             left join pg_catalog.pg_namespace as n
                 on n.oid = t.typnamespace
         where n.nspname in (${schemasString})
+            and e.enumlabel is not null
 `))
   ]
 
@@ -76,15 +77,18 @@ export async function getEnums(schemas: string[], config?: Configuration) {
   const enumValues: EnumValues = {}
 
   for (const row of enums) {
-    if (!enumValues[row.enum_name]) {
-      enumValues[row.enum_name] = {
-        schema: row.schema_name,
+    if (!enumValues[row.schema_name]) {
+      enumValues[row.schema_name] = {}
+    }
+    if (!enumValues[row.schema_name][row.enum_name]) {
+      enumValues[row.schema_name][row.enum_name] = {
         name: row.enum_name,
+        schema: row.schema_name,
         values: []
       }
     }
 
-    enumValues[row.enum_name].values.push(row.enum_value)
+    enumValues[row.schema_name][row.enum_name].values.push(row.enum_value)
   }
 
   return enumValues

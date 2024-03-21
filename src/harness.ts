@@ -1,7 +1,14 @@
 import { faker } from '@faker-js/faker'
 import { SupabaseClient, type AdminUserAttributes, User } from '@supabase/supabase-js'
 import { Fixtures } from './fixtures'
-import { Tables, fakeDataGenerators, getSchemaTree } from './tree'
+import {
+  Enum,
+  EnumValues,
+  Tables,
+  fakeDataGenerators,
+  getEnums,
+  getSchemaTree
+} from './tree'
 import type {
   DependencyGraph,
   Fixture,
@@ -85,6 +92,7 @@ export class Supawright<
 > {
   private schemas: Schema[]
   private tables: Tables
+  private enums: EnumValues
   private readonly options?: SupawrightOptions<Database, Schema>
   private dependencyGraph: DependencyGraph<Database, Schema>
   private _fixtures: Fixtures<Database, Schema> = new Fixtures()
@@ -96,17 +104,22 @@ export class Supawright<
     if (!schemas.length) {
       throw new Error('No schemas provided')
     }
-    const tables = await getSchemaTree(schemas, options?.database)
-    return new Supawright(schemas, tables, options)
+    const [tables, enums] = await Promise.all([
+      getSchemaTree(schemas, options?.database),
+      getEnums(schemas, options?.database)
+    ])
+    return new Supawright(schemas, tables, enums, options)
   }
 
   private constructor(
     schemas: Schema[],
     tables: Tables,
+    enums: EnumValues,
     options?: SupawrightOptions<Database, Schema>
   ) {
     this.schemas = schemas
     this.tables = tables
+    this.enums = enums
     this.options = options
     this.dependencyGraph = this.createDependencyGraph()
   }
@@ -591,9 +604,25 @@ export class Supawright<
         data[column as keyof typeof data] =
           newRecord[row.foreignKeys[column].foreignColumnName as keyof typeof newRecord]
       } else if (!row.foreignKeys[column]) {
-        const generator = dataGenerators[type as keyof typeof dataGenerators]
+        let generator: Generator<Database, Schema> | undefined
+        if (typeof type === 'string') {
+          // Regular type
+          generator = dataGenerators[type as keyof typeof dataGenerators]
+        } else {
+          // User-defined type
+          const enumType: Enum | undefined = this.enums[type.schema][type.name]
+          if (this.options?.generators?.['USER-DEFINED']) {
+            generator = this.options.generators['USER-DEFINED']
+          } else if (enumType) {
+            // Search for enum
+            generator = (_, __) =>
+              enumType.values[Math.floor(Math.random() * enumType.values.length)]
+          } else {
+            generator = dataGenerators['USER-DEFINED']
+          }
+        }
         if (!generator) {
-          throw new Error(`No generator for type ${type}`)
+          throw new Error(`No generator for type ${JSON.stringify(type)}`)
         }
         data[column as keyof typeof data] = generator(table, column) as any
         if (column.includes('email')) {
