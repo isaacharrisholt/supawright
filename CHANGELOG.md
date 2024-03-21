@@ -1,5 +1,11 @@
 # supawright
 
+## 0.2.0
+
+### Minor Changes
+
+- e026453: Automatically generate enum values, and add fallthrough for user-created generators.
+
 ## 0.1.1
 
 ### Patch Changes
