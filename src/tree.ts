@@ -1,34 +1,43 @@
 import { faker } from '@faker-js/faker'
-import { Client, type Configuration } from 'ts-postgres'
+import { connect, type Configuration } from 'ts-postgres'
 
 type SchemaRow = {
-  schema: string
-  table: string
-  column: string
-  nullable: boolean
-  hasDefault: boolean
-  type: string
-  foreignTableSchema: string
-  foreignTableName: string
-  foreignColumnName: string
-  isPrimaryKey: boolean
+  table_schema: string
+  table_name: string
+  column_name: string
+  is_nullable: 'YES' | 'NO'
+  column_default: string | null
+  is_identity: 'YES' | 'NO'
+  data_type: string
+  foreign_table_schema: string | null
+  foreign_table_name: string | null
+  foreign_column_name: string | null
+  is_primary_key: boolean
+  udt_schema: string
+  udt_name: string
 }
 
 type Table = {
   name: string
   schema: string
-  requiredColumns: Record<string, string>
+  requiredColumns: Record<string, string | { schema: string; name: string }>
   foreignKeys: Record<
     string,
-    { table: Table; foreignColumnName: string; nullable: boolean }
+    { table: Table; foreignColumnName: string | null; nullable: boolean }
   >
   primaryKeys: string[]
 }
 
 export type Tables = Record<string, Record<string, Table>>
+export type Enum = {
+  name: string
+  schema: string
+  values: string[]
+}
+export type EnumValues = Record<string, Enum>
 
-export async function getSchemaTree(schemas: string[], config?: Configuration) {
-  const client = new Client({
+async function getClient(config?: Configuration) {
+  return await connect({
     host: 'localhost',
     port: 54322,
     user: 'postgres',
@@ -36,10 +45,56 @@ export async function getSchemaTree(schemas: string[], config?: Configuration) {
     password: 'postgres',
     ...config
   })
+}
 
-  await client.connect()
+export async function getEnums(schemas: string[], config?: Configuration) {
+  const client = await getClient(config)
+
   const schemasString = schemas.map((s) => `'${s}'`).join(', ')
-  const results = await client.query(`
+
+  const enums = [
+    ...(await client.query<{
+      schema_name: string
+      enum_name: string
+      enum_value: string
+    }>(`
+        select
+            n.nspname as schema_name,
+            t.typname as enum_name,
+            e.enumlabel as enum_value
+        from pg_type as t
+            left join pg_enum as e
+                on t.oid = e.enumtypid
+            left join pg_catalog.pg_namespace as n
+                on n.oid = t.typnamespace
+        where n.nspname in (${schemasString})
+`))
+  ]
+
+  await client.end()
+
+  const enumValues: EnumValues = {}
+
+  for (const row of enums) {
+    if (!enumValues[row.enum_name]) {
+      enumValues[row.enum_name] = {
+        schema: row.schema_name,
+        name: row.enum_name,
+        values: []
+      }
+    }
+
+    enumValues[row.enum_name].values.push(row.enum_value)
+  }
+
+  return enumValues
+}
+
+export async function getSchemaTree(schemas: string[], config?: Configuration) {
+  const client = await getClient(config)
+
+  const schemasString = schemas.map((s) => `'${s}'`).join(', ')
+  const results = await client.query<SchemaRow>(`
         with foreign_keys as (
             select
                 tc.table_name, 
@@ -78,7 +133,10 @@ export async function getSchemaTree(schemas: string[], config?: Configuration) {
             fk.foreign_table_schema,
             fk.foreign_table_name,
             fk.foreign_column_name,
-            fk.is_primary_key
+            fk.is_primary_key,
+            cols.udt_schema,
+            cols.udt_name,
+            null as enum_values
         from information_schema.columns as cols
         left join foreign_keys as fk
             on cols.table_name = fk.table_name
@@ -86,82 +144,73 @@ export async function getSchemaTree(schemas: string[], config?: Configuration) {
         where cols.table_schema in (${schemasString})
     `)
 
+  await client.end()
+
   // Convert to objects to make them easier to work with
-  const rows = [...results]
-    .map((result) => {
-      const row = result.data
-      const schemaRow: SchemaRow = {
-        schema: row[0] as string,
-        table: row[1] as string,
-        column: row[2] as string,
-        nullable: row[3] === 'YES',
-        hasDefault: !!row[4] || row[5] === 'YES',
-        type: row[6] as string,
-        foreignTableSchema: row[7] as string,
-        foreignTableName: row[8] as string,
-        foreignColumnName: row[9] as string,
-        isPrimaryKey: !!row[10]
-      }
+  const rows = [...results].filter((row) => {
+    // We only care about the column if it's not nullable
+    // and has no default value or it's a foreign/primary key
+    const hasDefault = !!row.column_default || row.is_identity === 'YES'
+    if (
+      !!row.foreign_table_schema ||
+      row.is_primary_key ||
+      (row.is_nullable === 'NO' && !hasDefault)
+    ) {
+      return true
+    }
 
-      // We only care about the column if it's not nullable
-      // and has no default value or it's a foreign/primary key
-      if (
-        !!schemaRow.foreignTableSchema ||
-        schemaRow.isPrimaryKey ||
-        (!schemaRow.nullable && !schemaRow.hasDefault)
-      ) {
-        return schemaRow
-      }
-
-      return null
-    })
-    .filter(Boolean) as SchemaRow[]
+    return false
+  })
 
   const tables: Tables = {}
 
   for (const row of rows) {
-    if (!tables[row.schema]) {
-      tables[row.schema] = {}
+    if (!tables[row.table_schema]) {
+      tables[row.table_schema] = {}
     }
-    if (!tables[row.schema][row.table]) {
-      tables[row.schema][row.table] = {
-        name: row.table,
-        schema: row.schema,
+    if (!tables[row.table_schema][row.table_name]) {
+      tables[row.table_schema][row.table_name] = {
+        name: row.table_name,
+        schema: row.table_schema,
         requiredColumns: {},
         foreignKeys: {},
         primaryKeys: []
       }
     }
 
-    if (row.foreignTableSchema) {
-      if (!tables[row.foreignTableSchema]) {
-        tables[row.foreignTableSchema] = {}
+    if (row.foreign_table_schema && row.foreign_table_name) {
+      if (!tables[row.foreign_table_schema]) {
+        tables[row.foreign_table_schema] = {}
       }
-      if (!tables[row.foreignTableSchema][row.foreignTableName]) {
-        tables[row.foreignTableSchema][row.foreignTableName] = {
-          name: row.foreignTableName,
-          schema: row.foreignTableSchema,
+      if (!tables[row.foreign_table_schema][row.foreign_table_name]) {
+        tables[row.foreign_table_schema][row.foreign_table_name] = {
+          name: row.foreign_table_name,
+          schema: row.foreign_table_schema,
           requiredColumns: {},
           foreignKeys: {},
           primaryKeys: []
         }
       }
-      tables[row.schema][row.table].foreignKeys[row.column] = {
-        table: tables[row.foreignTableSchema][row.foreignTableName],
-        foreignColumnName: row.foreignColumnName,
-        nullable: row.nullable
+      tables[row.table_schema][row.table_name].foreignKeys[row.column_name] = {
+        table: tables[row.foreign_table_schema][row.foreign_table_name],
+        foreignColumnName: row.foreign_column_name,
+        nullable: row.is_nullable === 'YES'
       }
     }
 
-    if (!row.nullable && !row.hasDefault) {
-      tables[row.schema][row.table].requiredColumns[row.column] = row.type
+    const hasDefault = row.column_default || row.is_identity === 'YES'
+    if (row.is_nullable === 'NO' && !hasDefault) {
+      tables[row.table_schema][row.table_name].requiredColumns[row.column_name] =
+        row.data_type === 'USER-DEFINED'
+          ? { schema: row.udt_schema, name: row.udt_name }
+          : row.data_type
     }
 
     if (
-      row.isPrimaryKey &&
-      !tables[row.schema][row.table].primaryKeys.includes(row.column)
+      row.is_primary_key &&
+      !tables[row.table_schema][row.table_name].primaryKeys.includes(row.column_name)
     ) {
-      tables[row.schema][row.table].primaryKeys.push(row.column)
+      tables[row.table_schema][row.table_name].primaryKeys.push(row.column_name)
     }
   }
 
