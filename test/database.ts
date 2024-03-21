@@ -272,6 +272,42 @@ export type Database = {
           }
         ]
       }
+      enum_table: {
+        Row: {
+          enum_column: Database['public']['Enums']['some_enum'] | null
+          id: number
+          required_enum_column: Database['public']['Enums']['another_enum']
+        }
+        Insert: {
+          enum_column?: Database['public']['Enums']['some_enum'] | null
+          id?: never
+          required_enum_column: Database['public']['Enums']['another_enum']
+        }
+        Update: {
+          enum_column?: Database['public']['Enums']['some_enum'] | null
+          id?: never
+          required_enum_column?: Database['public']['Enums']['another_enum']
+        }
+        Relationships: []
+      }
+      generators: {
+        Row: {
+          age: number
+          id: number
+          name: string
+        }
+        Insert: {
+          age: number
+          id?: never
+          name: string
+        }
+        Update: {
+          age?: number
+          id?: never
+          name?: string
+        }
+        Relationships: []
+      }
       other_schemas_foreign_child: {
         Row: {
           id: number
@@ -358,7 +394,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      another_enum: 'x' | 'y' | 'z'
+      some_enum: 'a' | 'b' | 'c'
     }
     CompositeTypes: {
       [_ in never]: never

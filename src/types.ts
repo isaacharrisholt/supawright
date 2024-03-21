@@ -41,7 +41,7 @@ export type DependencyGraph<
       `${Schema}.${TableIn<Database, Schema>}`,
       {
         column: keyof Select<Database, Schema, TableIn<Database, Schema>>
-        references: keyof Select<Database, Schema, TableIn<Database, Schema>>
+        references: keyof Select<Database, Schema, TableIn<Database, Schema>> | null
       }[]
     >
   >

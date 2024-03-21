@@ -193,6 +193,10 @@ const test = withSupawright<
 )
 ```
 
+If your generator returns `null` or `undefined`, Supawright will fall back to
+using the built-in generators. In the case of enums, Supawright will pick a
+random valid enum value.
+
 ### Connection details
 
 By default, Supawright will look for the `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
