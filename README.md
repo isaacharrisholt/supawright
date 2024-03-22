@@ -221,6 +221,11 @@ const test = withSupawright<Database, 'public' | 'other'>(['public', 'other'], {
 })
 ```
 
+## Support
+
+Are you a company using Supawright? Get in touch if you're interested in supporting
+the package, or if you'd like premium support.
+
 ## TODO
 
 - [x] Automatically infer allowed enum values from database
