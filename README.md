@@ -195,6 +195,21 @@ If your generator returns `null` or `undefined`, Supawright will fall back to
 using the built-in generators. In the case of enums, Supawright will pick a
 random valid enum value.
 
+### Teardown
+
+If you'd like to run some code after each test, but before Supawright cleans
+up after itself, you can pass a `beforeTeardown` function to the `withSupawright`
+function. This function will be passed the `Supawright` object from the test, as
+well as the page object from Playwright.
+
+```ts
+const test = withSupawright<Database, 'public' | 'other'>(['public', 'other'], {
+  beforeTeardown: async ({ page, supawright }) => {
+    await page.waitForLoadState('networkidle')
+  }
+})
+```
+
 ### Connection details
 
 By default, Supawright will look for the `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
