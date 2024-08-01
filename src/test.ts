@@ -1,5 +1,6 @@
 import { test } from '@playwright/test'
 import type {
+  Page,
   PlaywrightTestArgs,
   PlaywrightTestOptions,
   PlaywrightWorkerArgs,
@@ -8,6 +9,16 @@ import type {
 } from '@playwright/test'
 import { SupawrightOptions, Supawright } from './harness'
 import { GenericDatabase, SchemaOf } from './types'
+
+type ExtensionOptions<
+  Database extends GenericDatabase,
+  Schema extends SchemaOf<Database>
+> = {
+  beforeTeardown?: (params: {
+    supawright: Supawright<Database, Schema>
+    page: Page
+  }) => Promise<void>
+}
 
 /**
  * Factory for a test extension that provides a Supawright harness
@@ -20,7 +31,7 @@ export function withSupawright<
   Schema extends SchemaOf<Database>
 >(
   schemas: [Schema, ...Schema[]],
-  options?: SupawrightOptions<Database, Schema>
+  options?: SupawrightOptions<Database, Schema> & ExtensionOptions<Database, Schema>
 ): TestType<
   PlaywrightTestArgs &
     PlaywrightTestOptions & {
@@ -31,9 +42,13 @@ export function withSupawright<
   return test.extend<{
     supawright: Supawright<Database, Schema>
   }>({
-    supawright: async ({}, use) => {
-      const supawright = await Supawright.new(schemas, options)
+    supawright: async ({ page }, use) => {
+      const { beforeTeardown, ...supawrightOptions } = options ?? {}
+      const supawright = await Supawright.new(schemas, supawrightOptions)
       await use(supawright)
+      if (beforeTeardown) {
+        await beforeTeardown({ supawright, page })
+      }
       await supawright.teardown()
     }
   })
