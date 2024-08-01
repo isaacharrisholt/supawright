@@ -1,5 +1,11 @@
 # supawright
 
+## 0.3.0
+
+### Minor Changes
+
+- d4621d4: Add `beforeTeardown` function
+
 ## 0.2.0
 
 ### Minor Changes
