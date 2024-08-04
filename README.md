@@ -17,29 +17,33 @@ pnpm i -D supawright
 
 ### Setup
 
-Unfortunately, Supabase's generated TypeScript types generate an interface,
-whereas for type constraints, we need a type. So, first change the following
-line in your generated Supabase types (typically `database.ts`):
+> [!IMPORTANT]
+> Unfortunately, older versions of `postgres-meta` would generate TypeScript types
+> as an interface, whereas for type constraints, we need a type.
+>
+> <details>
+>   <summary>Fix instructions</summary>
+> Change the following line in your generated Supabase types (typically
+> `database.ts`):
+> 
+> ```diff
+> - export interface Database {
+> + export type Database = {
+> ```
+> 
+> I recommend setting up a `make` target (or whichever build tool you use) to
+> automatically make this change for you, e.g.
+> 
+> ```make
+> types:
+>     pnpm supabase gen types typescript --local | \
+>     sed 's/export interface Database {/export type Database = {/' \
+>     > src/types/database.ts
+> ```
+> </details>
 
-> Note: this has now been changed, but will still apply to old Supabase versions.
-
-```diff
-- export interface Database {
-+ export type Database = {
-```
-
-I recommend setting up a `make` target (or whichever build tool you use) to
-automatically make this change for you, e.g.
-
-```make
-types:
-    pnpm supabase gen types typescript --local | \
-    sed 's/export interface Database {/export type Database = {/' \
-    > src/types/database.ts
-```
-
-Then, create a test file, e.g. `can-login.test.ts`, and create a test function
-with the `withSupawright` function:
+To get started, create a test file, e.g. `can-login.test.ts`, and create a `test`
+function with the `withSupawright` helper:
 
 ```ts
 import { withSupawright } from 'supawright'
@@ -51,9 +55,10 @@ const test = withSupawright<
 >(['public', 'other'])
 ```
 
-1: Unfortunately, I haven't found a nice way of infering the schema names from
-the first argument, so you'll have to specify the schemas you'd like Supawright
-to use in two places.
+> [!NOTE]
+> Unfortunately, I haven't found a nice way of infering the schema names from
+> the first argument, so you'll have to specify the schemas you'd like Supawright
+> to use in two places.
 
 ### Tests
 
@@ -135,8 +140,9 @@ test('can login', async ({ supawright }) => {
 })
 ```
 
-Note: the `.supabase()` method of the `Supawright` object takes an optional
-schema name to create a Supabase client in the chosen schema.
+> [!NOTE]
+> The `.supabase()` method of the `Supawright` object takes an optional
+> schema name to create a Supabase client in the chosen schema.
 
 ### Overrides
 
