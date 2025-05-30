@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
 import { withSupawright } from '../src'
-import { Database } from './database'
+import type { Database } from './database'
 
 const test = withSupawright<Database, 'public' | 'other'>(['public', 'other'])
 
@@ -30,7 +30,7 @@ test('can discover child records across schema boundaries', async ({ supawright 
   const parent = await supawright.create('other', 'other_schemas_parent')
 
   const { error: childSelectError } = await supawright
-    .supabase()
+    .supabase('public')
     .from('other_schemas_foreign_child')
     .select()
     .eq('parent_id', parent.id)
@@ -40,7 +40,7 @@ test('can discover child records across schema boundaries', async ({ supawright 
   await supawright.teardown()
 
   const { data, error } = await supawright
-    .supabase()
+    .supabase('public')
     .from('other_schemas_foreign_child')
     .select()
 

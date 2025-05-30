@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { GenericDatabase, SchemaOf, SupabaseClientCredentials } from './types'
+import type { GenericDatabase, SchemaOf, SupabaseClientCredentials } from './types'
 
 export function createSupabaseTestClient<
   Database extends GenericDatabase,
@@ -15,11 +15,11 @@ export function createSupabaseTestClient<
 }
 
 export const log = {
-  debug(...args: any[]) {
+  debug(...args: unknown[]) {
     process.env.TEST_DEBUG && console.log(...args)
   },
 
-  error(...args: any[]) {
+  error(...args: unknown[]) {
     console.error(...args)
   }
 }

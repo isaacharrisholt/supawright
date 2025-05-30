@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
 import { withSupawright } from '../src'
-import { Database } from './database'
+import type { Database } from './database'
 
 const test = withSupawright<Database, 'public'>(['public'])
 
