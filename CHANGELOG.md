@@ -1,5 +1,11 @@
 # supawright
 
+## 0.4.1
+
+### Patch Changes
+
+- c4cc883: Fix readme
+
 ## 0.4.0
 
 ### Minor Changes
