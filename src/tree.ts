@@ -101,24 +101,24 @@ export async function getSchemaTree(schemas: string[], config?: Configuration) {
   const results = await client.query<SchemaRow>(`
         with foreign_keys as (
             select
-                tc.table_name, 
-                kcu.column_name, 
-                tc.constraint_type = 'PRIMARY KEY' as is_primary_key,
+                tc.table_name,
+                kcu.column_name,
+                tc.constraint_type = 'PRIMARY KEY'::text as is_primary_key,
                 -- Only show foreign key information for foreign keys
                 -- Otherwise, we'll get duplicate rows for primary keys
                 case
-                  when tc.constraint_type = 'FOREIGN KEY'
-                    then ccu.table_schema 
+                  when tc.constraint_type = 'FOREIGN KEY'::text
+                    then ccu.table_schema
                 end as foreign_table_schema,
                 case
-                  when tc.constraint_type = 'FOREIGN KEY'
-                    then ccu.table_name 
+                  when tc.constraint_type = 'FOREIGN KEY'::text
+                    then ccu.table_name
                 end as foreign_table_name,
                 case
-                  when tc.constraint_type = 'FOREIGN KEY'
-                    then ccu.column_name 
+                  when tc.constraint_type = 'FOREIGN KEY'::text
+                    then ccu.column_name
                 end as foreign_column_name
-            from information_schema.table_constraints as tc 
+            from information_schema.table_constraints as tc
                 left join information_schema.key_column_usage as kcu
                     on tc.constraint_name = kcu.constraint_name
                 left join information_schema.constraint_column_usage as ccu
