@@ -1,5 +1,11 @@
 # supawright
 
+## 0.4.2
+
+### Patch Changes
+
+- c1f1714: Update discovery query with type coercions
+
 ## 0.4.1
 
 ### Patch Changes
