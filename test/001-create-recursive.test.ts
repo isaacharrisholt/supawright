@@ -26,8 +26,8 @@ test('required foreign key dependencies are automatically created', async ({
     .select()
   expect(error).toBeNull()
   expect(data?.length).toBe(1)
-  expect(data?.[0].id).toBeTruthy()
-  expect(data?.[0].required_foreign_key).toBeTruthy()
+  expect(data?.[0].id ?? null).not.toBeNull()
+  expect(data?.[0].required_foreign_key ?? null).not.toBeNull()
 
   const { data: parents } = await supawright
     .supabase('public')
@@ -63,8 +63,8 @@ test('can create table with multiple dependencies', async ({ supawright }) => {
     .select()
   expect(error).toBeNull()
   expect(data?.length).toBe(1)
-  expect(data?.[0].required_foreign_key_1).toBeTruthy()
-  expect(data?.[0].required_foreign_key_2).toBeTruthy()
+  expect(data?.[0].required_foreign_key_1 ?? null).not.toBeNull()
+  expect(data?.[0].required_foreign_key_2 ?? null).not.toBeNull()
 
   const { data: parent1 } = await supawright
     .supabase('public')
@@ -88,7 +88,7 @@ test('grandparent dependencies are created', async ({ supawright }) => {
     .select()
   expect(error).toBeNull()
   expect(data?.length).toBe(1)
-  expect(data?.[0].required_foreign_key).toBeTruthy()
+  expect(data?.[0].required_foreign_key ?? null).not.toBeNull()
 
   const { data: parent } = await supawright
     .supabase('public')
