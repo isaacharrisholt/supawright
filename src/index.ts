@@ -1,3 +1,3 @@
 export { withSupawright } from './test'
 
-export type { Supawright, Creator } from './harness'
+export { Supawright, type Creator } from './harness'

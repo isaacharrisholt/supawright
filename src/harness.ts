@@ -1,10 +1,10 @@
 import { faker } from '@faker-js/faker'
-import { SupabaseClient, type AdminUserAttributes, User } from '@supabase/supabase-js'
+import type { SupabaseClient, AdminUserAttributes, User } from '@supabase/supabase-js'
 import { Fixtures } from './fixtures'
 import {
-  Enum,
-  EnumValues,
-  Tables,
+  type Enum,
+  type EnumValues,
+  type Tables,
   fakeDataGenerators,
   getEnums,
   getSchemaTree
@@ -168,7 +168,7 @@ export class Supawright<
 
     if (error) {
       log?.error('Failed to refresh fixture', { error })
-      throw new Error('Failed to refresh fixture: ' + error.message)
+      throw new Error(`Failed to refresh fixture: ${error.message}`)
     }
 
     this._fixtures.update(
@@ -224,7 +224,7 @@ export class Supawright<
         const supabase = this.supabase(dependentTableSchema)
         let query = supabase.from(dependentTableName).select()
 
-        const filterString = (dependencies as any[])
+        const filterString = (dependencies as { column: string; references: string }[])
           .map((dependency) => {
             return `${dependency.column}.in.(${rootTableFixtures
               .map(
@@ -244,7 +244,7 @@ export class Supawright<
 
         if (error) {
           log?.error('Error discovering records', { error })
-          throw new Error('Error discovering records: ' + error.message)
+          throw new Error(`Error discovering records: ${error.message}`)
         }
 
         data.length &&
@@ -274,8 +274,7 @@ export class Supawright<
    * @param schema The schema to use for the client
    * @returns A supabase client for the given schema
    */
-  public supabase(schema?: Schema): SupabaseClient<Database, Schema> {
-    schema = schema ?? (this.schemas[0] as Schema)
+  public supabase<S extends Schema>(schema: S): SupabaseClient<Database, S> {
     const credentials = {
       supabaseUrl:
         this.options?.supabase?.supabaseUrl ??
@@ -286,7 +285,7 @@ export class Supawright<
         process.env.SUPABASE_SERVICE_ROLE_KEY ??
         DEFAULT_SUPABASE_SERVICE_ROLE_KEY
     }
-    return createSupabaseTestClient<Database, Schema>(
+    return createSupabaseTestClient<Database, S>(
       credentials as SupabaseClientCredentials,
       schema
     )
@@ -429,7 +428,7 @@ export class Supawright<
       const { data, error } = await deletionQuery.select()
       if (error) {
         log?.error('Error deleting records', { error })
-        throw new Error('Error deleting records: ' + error.message)
+        throw new Error(`Error deleting records: ${error.message}`)
       }
       log?.debug(`Deleted ${data?.length} records from ${qualifiedTable}`)
     }
@@ -448,7 +447,7 @@ export class Supawright<
 
         if (error) {
           log?.error('Error listing objects in bucket', { error, bucket })
-          throw new Error('Error listing objects in bucket: ' + error.message)
+          throw new Error(`Error listing objects in bucket: ${error.message}`)
         }
 
         await supabase.storage
@@ -466,7 +465,7 @@ export class Supawright<
       const { error } = await supabase.auth.admin.deleteUser(authRecord)
       if (error) {
         log?.error('Error removing auth record', { error, authRecord })
-        throw new Error(`Error removing auth record ${authRecord}: ` + error.message)
+        throw new Error(`Error removing auth record ${authRecord}: ${error.message}`)
       }
     }
     // Clear local cache.
@@ -481,14 +480,14 @@ export class Supawright<
    * @throws If the user could not be created
    */
   public async createUser(attributes?: AdminUserAttributes): Promise<User> {
-    const { data, error } = await this.supabase().auth.admin.createUser({
+    const { data, error } = await this.supabase(this.schemas[0]).auth.admin.createUser({
       email: faker.internet.email(),
       password: faker.internet.password(),
       ...attributes
     })
     if (error) {
       log.error('Error creating user', { error, attributes })
-      throw new Error('Error creating user: ' + error.message)
+      throw new Error(`Error creating user: ${error.message}`)
     }
     this.record({
       schema: 'auth',
@@ -610,7 +609,7 @@ export class Supawright<
           table,
           column,
           type
-        )
+        ) as (typeof data)[keyof typeof data]
       }
     }
 
@@ -623,10 +622,7 @@ export class Supawright<
     if (error) {
       log?.error('Error inserting data', { error, table })
       throw new Error(
-        `Error inserting data into ${table}: ` +
-          error.message +
-          '\nData: ' +
-          JSON.stringify(data)
+        `Error inserting data into ${table}: ${error.message}\nData: ${JSON.stringify(data)}`
       )
     }
 
@@ -649,8 +645,8 @@ export class Supawright<
     table: string,
     column: string,
     type: string | { schema: string; name: string }
-  ): any {
-    let val: any = null
+  ): unknown {
+    let val: unknown = null
 
     if (typeof type === 'string') {
       // Regular type
@@ -659,7 +655,7 @@ export class Supawright<
         (type.includes('text') || type.includes('varchar')) &&
         column.includes('email')
       ) {
-        return faker.internet.email() as any
+        return faker.internet.email()
       }
 
       // Try user-defined generator if it exists, otherwise fall back to built-in

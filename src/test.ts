@@ -7,8 +7,8 @@ import type {
   PlaywrightWorkerOptions,
   TestType
 } from '@playwright/test'
-import { SupawrightOptions, Supawright } from './harness'
-import { GenericDatabase, SchemaOf } from './types'
+import { type SupawrightOptions, Supawright } from './harness'
+import type { GenericDatabase, SchemaOf } from './types'
 
 type ExtensionOptions<
   Database extends GenericDatabase,

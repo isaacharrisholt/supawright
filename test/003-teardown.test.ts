@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
 import { withSupawright } from '../src'
-import { Database } from './database'
+import type { Database } from './database'
 import { faker } from '@faker-js/faker'
 
 const test = withSupawright<Database, 'public'>(['public'])
@@ -11,7 +11,7 @@ test('can successfully teardown single table records', async ({ supawright }) =>
   await supawright.teardown()
 
   const { data, error } = await supawright
-    .supabase()
+    .supabase('public')
     .from('teardown_parent')
     .select()
     .eq('id', record.id)
@@ -22,7 +22,7 @@ test('can successfully teardown single table records', async ({ supawright }) =>
 test('can successfully discover dependent records', async ({ supawright }) => {
   const parent = await supawright.create('teardown_parent')
   const { data: child, error: childInsertError } = await supawright
-    .supabase()
+    .supabase('public')
     .from('teardown_child')
     .insert({
       id: faker.string.uuid(),
@@ -31,14 +31,17 @@ test('can successfully discover dependent records', async ({ supawright }) => {
     .select()
     .single()
   expect(childInsertError).toBeNull()
+  if (!child) {
+    throw new Error('Child record not found')
+  }
 
   await supawright.teardown()
 
   const { data, error } = await supawright
-    .supabase()
+    .supabase('public')
     .from('teardown_child')
     .select()
-    .eq('id', child!.id)
+    .eq('id', child.id)
   expect(error).toBeNull()
   expect(data?.length).toBe(0)
 })
@@ -49,7 +52,7 @@ test('can successfully teardown an auth user', async ({ supawright }) => {
   await supawright.teardown()
 
   const { data: foundUser, error } = await supawright
-    .supabase()
+    .supabase('public')
     .auth.admin.getUserById(user.id)
   expect(foundUser.user).toBeNull()
   expect(error?.status).toBe(404)
@@ -59,7 +62,7 @@ test('can successfully discover dependents of auth users', async ({ supawright }
   const user = await supawright.createUser()
 
   const { error: childInsertError } = await supawright
-    .supabase()
+    .supabase('public')
     .from('teardown_auth_dependent')
     .insert({
       user_id: user.id
@@ -72,7 +75,7 @@ test('can successfully discover dependents of auth users', async ({ supawright }
   await supawright.teardown()
 
   const { data, error } = await supawright
-    .supabase()
+    .supabase('public')
     .from('teardown_auth_dependent')
     .select()
 
