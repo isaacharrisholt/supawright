@@ -1,5 +1,11 @@
 # supawright
 
+## 0.4.0
+
+### Minor Changes
+
+- 76539aa: Expose the Supawright class and fix some typings
+
 ## 0.3.0
 
 ### Minor Changes
