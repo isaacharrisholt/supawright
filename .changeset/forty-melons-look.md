@@ -1,0 +1,5 @@
+---
+'supawright': patch
+---
+
+Fix readme

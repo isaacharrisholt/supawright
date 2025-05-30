@@ -25,15 +25,15 @@ pnpm i -D supawright
 >   <summary>Fix instructions</summary>
 > Change the following line in your generated Supabase types (typically
 > `database.ts`):
-> 
+>
 > ```diff
 > - export interface Database {
 > + export type Database = {
 > ```
-> 
+>
 > I recommend setting up a `make` target (or whichever build tool you use) to
 > automatically make this change for you, e.g.
-> 
+>
 > ```make
 > types:
 >     pnpm supabase gen types typescript --local | \
@@ -109,7 +109,7 @@ test('can login', async ({ supawright }) => {
   })
   // Supawright will not create a user record, since we've passed in
   // a user_id.
-  const { data: users } = await supawright.supabase().from('user').select()
+  const { data: users } = await supawright.supabase('public').from('user').select()
   expect(users.length).toBe(1)
 })
 ```
@@ -131,7 +131,7 @@ test('can login', async ({ supawright }) => {
   // Since we're using the standard Supabase client here, Supawright
   // is unaware of the records we're creating.
   await supawright
-    .supabase()
+    .supabase('public')
     .from('session')
     .insert([{ user_id: user.id }, { user_id: user.id }])
 
@@ -141,7 +141,7 @@ test('can login', async ({ supawright }) => {
 ```
 
 > [!NOTE]
-> The `.supabase()` method of the `Supawright` object takes an optional
+> The `.supabase()` method of the `Supawright` object takes a
 > schema name to create a Supabase client in the chosen schema.
 
 ### Overrides
