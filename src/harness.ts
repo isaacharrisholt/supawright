@@ -26,6 +26,54 @@ import type { Configuration as PostgresConfig } from 'ts-postgres'
 const DEFAULT_SUPABASE_URL = 'http://localhost:54321'
 const DEFAULT_SUPABASE_SERVICE_ROLE_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+const DEFAULT_DATABASE_CONFIG = {}
+
+type SchemaMetadata = [Tables, EnumValues]
+
+const schemaMetadataCaches = new WeakMap<object, Map<string, Promise<SchemaMetadata>>>()
+
+async function getSchemaMetadata(
+  schemas: string[],
+  databaseConfig?: PostgresConfig
+): Promise<SchemaMetadata> {
+  const cacheOwner = databaseConfig ?? DEFAULT_DATABASE_CONFIG
+  let cache = schemaMetadataCaches.get(cacheOwner)
+  if (!cache) {
+    cache = new Map()
+    schemaMetadataCaches.set(cacheOwner, cache)
+  }
+
+  const cacheKey = [...schemas].sort().join('\0')
+  let metadata = cache.get(cacheKey)
+  if (!metadata) {
+    metadata = Promise.all([
+      getSchemaTree(schemas, databaseConfig),
+      getEnums(schemas, databaseConfig)
+    ])
+    cache.set(cacheKey, metadata)
+  }
+
+  try {
+    return await metadata
+  } catch (error) {
+    if (cache.get(cacheKey) === metadata) {
+      cache.delete(cacheKey)
+    }
+    throw error
+  }
+}
+
+function createManyInputs<Data>(
+  dataOrCount: number | readonly Partial<Data>[]
+): Partial<Data>[] {
+  if (typeof dataOrCount !== 'number') {
+    return dataOrCount.map((data) => ({ ...data }))
+  }
+  if (!Number.isSafeInteger(dataOrCount) || dataOrCount < 0) {
+    throw new Error('createMany count must be a non-negative safe integer')
+  }
+  return Array.from({ length: dataOrCount }, () => ({}))
+}
 
 type Generator<Database extends GenericDatabase, Schema extends SchemaOf<Database>> =
   | (() => unknown)
@@ -104,10 +152,7 @@ export class Supawright<
     if (!schemas.length) {
       throw new Error('No schemas provided')
     }
-    const [tables, enums] = await Promise.all([
-      getSchemaTree(schemas, options?.database),
-      getEnums(schemas, options?.database)
-    ])
+    const [tables, enums] = await getSchemaMetadata(schemas, options?.database)
     return new Supawright(schemas, tables, enums, options)
   }
 
@@ -192,31 +237,90 @@ export class Supawright<
   }
 
   /**
-   * Search the database from the root tables and discover all records
-   * associated with the fixtures.
+   * Search the database from recorded fixtures and discover all related records.
    *
    * Discovered records are recorded against the Supawright instance for
    * later use.
    */
   async discoverRecords() {
-    const tablesToVisit = this.getRootTables()
-    log?.debug('Starting record discovery', { tablesToVisit })
-    // For each of the root tables, discover records for all dependent tables.
-    while (tablesToVisit.length) {
-      const rootTable = tablesToVisit.shift()
+    type AnyFixture = Fixture<Database, Schema, TableIn<Database, Schema>>
+    type TableVisit = {
+      schema: Schema
+      name: TableIn<Database, Schema>
+      fixtures: AnyFixture[]
+    }
 
-      if (!rootTable) {
+    const tablesToVisit = new Map<string, TableVisit>()
+    const recordedFixtureKeys = new Map<string, Set<string>>()
+
+    function tableKey(schema: Schema, table: TableIn<Database, Schema>) {
+      return `${schema}.${table}`
+    }
+
+    const fixtureKey = (
+      schema: Schema,
+      table: TableIn<Database, Schema>,
+      data: Select<Database, Schema, TableIn<Database, Schema>>
+    ) => {
+      const primaryKeys = this.tables[schema]?.[table]?.primaryKeys ?? []
+      return JSON.stringify(
+        primaryKeys.length ? primaryKeys.map((key) => data[key]) : data
+      )
+    }
+
+    const queueFixture = (fixture: AnyFixture, shouldRecord: boolean) => {
+      const schema = fixture.schema as Schema
+      const table = fixture.table as TableIn<Database, Schema>
+      const key = tableKey(schema, table)
+      const fixtureKeys = recordedFixtureKeys.get(key) ?? new Set<string>()
+      const keyForFixture = fixtureKey(schema, table, fixture.data)
+      if (fixtureKeys.has(keyForFixture)) {
+        return
+      }
+      fixtureKeys.add(keyForFixture)
+      recordedFixtureKeys.set(key, fixtureKeys)
+
+      if (shouldRecord) {
+        this.record(fixture)
+      }
+
+      const visit = tablesToVisit.get(key) ?? {
+        schema,
+        name: table,
+        fixtures: []
+      }
+      visit.fixtures.push(fixture)
+      tablesToVisit.set(key, visit)
+    }
+
+    for (const fixture of this.fixtures()) {
+      queueFixture(fixture, false)
+    }
+
+    log?.debug('Starting record discovery', { tablesToVisit })
+    // Follow only newly recorded fixtures through the graph. A record may be
+    // returned through several paths, but its dependents only need visiting once.
+    while (tablesToVisit.size) {
+      const nextTable = tablesToVisit.entries().next().value
+
+      if (!nextTable) {
         continue
       }
 
-      const { schema: rootTableSchema, name: rootTableName } = rootTable
+      const [rootKey, rootTable] = nextTable
+      tablesToVisit.delete(rootKey)
+      const {
+        schema: rootTableSchema,
+        name: rootTableName,
+        fixtures: rootTableFixtures
+      } = rootTable
       log?.debug(
         `Discovering records for dependents of ${rootTableSchema}.${rootTableName}`
       )
 
       const dependentTables =
-        this.dependencyGraph[`${rootTableSchema}.${rootTableName}`]
-      const rootTableFixtures = this.fixtures(rootTableSchema, rootTableName)
+        this.dependencyGraph[`${rootTableSchema}.${rootTableName}`] ?? {}
+
       for (const [dependentTable, dependencies] of Object.entries(dependentTables)) {
         const [dependentTableSchema, dependentTableName] = dependentTable.split(
           '.'
@@ -251,19 +355,18 @@ export class Supawright<
           log?.debug(`Discovered ${data.length} records for ${dependentTable}`)
 
         for (const record of data) {
-          this.record({
-            schema: dependentTableSchema,
-            table: dependentTableName,
-            data: record as unknown as Select<
-              Database,
-              Schema,
-              TableIn<Database, Schema>
-            >
-          })
-          tablesToVisit.push({
-            schema: dependentTableSchema,
-            name: dependentTableName
-          })
+          queueFixture(
+            {
+              schema: dependentTableSchema,
+              table: dependentTableName,
+              data: record as unknown as Select<
+                Database,
+                Schema,
+                TableIn<Database, Schema>
+              >
+            },
+            true
+          )
         }
       }
     }
@@ -437,28 +540,30 @@ export class Supawright<
       (fixture) => fixture.data.id as string
     )
 
-    log?.debug('Deleting storage objects')
     const supabase = this.supabase(this.schemas[0])
-    await Promise.allSettled(
-      (await supabase.storage.listBuckets()).data?.map(async (bucket) => {
-        const { data: allObjects, error } = await supabase.storage
-          .from(bucket.name)
-          .list()
+    if (authRecordsToRemove.length) {
+      log?.debug('Deleting storage objects')
+      await Promise.allSettled(
+        (await supabase.storage.listBuckets()).data?.map(async (bucket) => {
+          const { data: allObjects, error } = await supabase.storage
+            .from(bucket.name)
+            .list()
 
-        if (error) {
-          log?.error('Error listing objects in bucket', { error, bucket })
-          throw new Error(`Error listing objects in bucket: ${error.message}`)
-        }
+          if (error) {
+            log?.error('Error listing objects in bucket', { error, bucket })
+            throw new Error(`Error listing objects in bucket: ${error.message}`)
+          }
 
-        await supabase.storage
-          .from(bucket.name)
-          .remove(
-            allObjects
-              ?.filter((object) => authRecordsToRemove.includes(object.owner))
-              .map((object) => object.name) ?? []
-          )
-      }) ?? []
-    )
+          await supabase.storage
+            .from(bucket.name)
+            .remove(
+              allObjects
+                ?.filter((object) => authRecordsToRemove.includes(object.owner))
+                .map((object) => object.name) ?? []
+            )
+        }) ?? []
+      )
+    }
 
     log?.debug(`Removing ${authRecordsToRemove.length} auth records`)
     for (const authRecord of authRecordsToRemove) {
@@ -495,6 +600,90 @@ export class Supawright<
       data: data.user as unknown as Select<Database, 'auth', 'users'>
     })
     return data.user
+  }
+
+  /**
+   * Creates several records in one insert after resolving their generated data
+   * and foreign-key fixtures in order.
+   * @param schema The schema name of the records to create. Defaults to 'public'
+   * @param table The table name of the records to create
+   * @param dataOrCount Partial records to create, or the number of generated records
+   * @returns The created records
+   */
+  public async createMany<
+    S extends 'public' extends Schema ? 'public' : never,
+    Table extends TableIn<Database, 'public'>
+  >(
+    table: S extends 'public' ? Table : never,
+    dataOrCount:
+      | number
+      | readonly (S extends 'public' ? Partial<Insert<Database, S, Table>> : never)[]
+  ): Promise<Select<Database, S, Table>[]>
+  public async createMany<S extends Schema, Table extends TableIn<Database, S>>(
+    schema: S,
+    table: Table,
+    dataOrCount: number | readonly Partial<Insert<Database, S, Table>>[]
+  ): Promise<Select<Database, S, Table>[]>
+  public async createMany<S extends Schema, Table extends TableIn<Database, S>>(
+    schemaOrTable: S | Table,
+    tableOrData: Table | number | readonly Partial<Insert<Database, S, Table>>[],
+    dataOrCount?: number | readonly Partial<Insert<Database, S, Table>>[]
+  ): Promise<Select<Database, S, Table>[]> {
+    let schema: S
+    let table: Table
+
+    if (typeof tableOrData === 'string') {
+      schema = schemaOrTable as S
+      table = tableOrData
+    } else {
+      schema = 'public' as S
+      table = schemaOrTable as Table
+      dataOrCount = tableOrData
+    }
+
+    if (dataOrCount === undefined) {
+      throw new Error('No data or count provided to createMany')
+    }
+
+    const inputs = createManyInputs<Insert<Database, S, Table>>(dataOrCount)
+    if (!inputs.length) {
+      return []
+    }
+
+    if (
+      (schema === 'auth' && table === 'users') ||
+      this.options?.overrides?.[schema]?.[table]
+    ) {
+      const records: Select<Database, S, Table>[] = []
+      for (const input of inputs) {
+        records.push(await this.create(schema, table, input))
+      }
+      return records
+    }
+
+    const preparedInputs: Partial<Insert<Database, S, Table>>[] = []
+    for (const input of inputs) {
+      preparedInputs.push(await this.prepareData(schema, table, input))
+    }
+
+    const tableClient = this.supabase(schema).from(table)
+    const preparedInserts = preparedInputs as Parameters<typeof tableClient.insert>[0]
+    const { data: insertedData, error } = await tableClient
+      .insert(preparedInserts)
+      .select()
+
+    if (error) {
+      log?.error('Error inserting data', { error, table })
+      throw new Error(
+        `Error inserting data into ${table}: ${error.message}\nData: ${JSON.stringify(preparedInputs)}`
+      )
+    }
+
+    const records = insertedData as unknown as Select<Database, S, Table>[]
+    for (const record of records) {
+      this.record({ schema, table, data: record })
+    }
+    return records
   }
 
   /**
@@ -575,12 +764,37 @@ export class Supawright<
       return fixtureForTable.data as Select<Database, S, Table>
     }
 
-    if (!data) {
-      data = {}
+    data = await this.prepareData(schema, table, data ?? {})
+
+    const { data: insertData, error } = await supabase
+      .from(table)
+      .insert(data as any)
+      .select()
+      .single()
+
+    if (error) {
+      log?.error('Error inserting data', { error, table })
+      throw new Error(
+        `Error inserting data into ${table}: ${error.message}\nData: ${JSON.stringify(data)}`
+      )
     }
+
+    data = insertData as typeof data
+    log.debug(`Recording ${schema}.${table}`)
+    this.record({ schema, table, data })
+
+    return data
+  }
+
+  private async prepareData<S extends Schema, Table extends TableIn<Database, S>>(
+    schema: S,
+    table: Table,
+    input: Partial<Insert<Database, S, Table>>
+  ): Promise<Partial<Insert<Database, S, Table>>> {
+    const data = { ...input }
     const row = this.tables[schema][table]
 
-    // Generate dummy data for all required columns
+    // Generate dummy data for all required columns.
     for (const [column, type] of Object.entries(row.requiredColumns)) {
       if (data[column]) {
         continue
@@ -590,7 +804,7 @@ export class Supawright<
         const newSchema = row.foreignKeys[column].table.schema as Schema
         let newRecord: Select<Database, S, Table> | undefined
 
-        // If there's already a record for this table, use it.
+        // Resolve dependencies in order so later records reuse earlier fixtures.
         log.debug(`Looking for existing record for ${newSchema}.${newTable}`)
         log.debug(this._fixtures)
         const fixtures = this._fixtures.get(newSchema, newTable)
@@ -612,23 +826,6 @@ export class Supawright<
         ) as (typeof data)[keyof typeof data]
       }
     }
-
-    const { data: insertData, error } = await supabase
-      .from(table)
-      .insert(data as any)
-      .select()
-      .single()
-
-    if (error) {
-      log?.error('Error inserting data', { error, table })
-      throw new Error(
-        `Error inserting data into ${table}: ${error.message}\nData: ${JSON.stringify(data)}`
-      )
-    }
-
-    data = insertData as typeof data
-    log.debug(`Recording ${schema}.${table}`)
-    this.record({ schema, table, data })
 
     return data
   }

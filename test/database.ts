@@ -374,6 +374,28 @@ export type Database = {
           }
         ]
       }
+      teardown_grandchild: {
+        Row: {
+          child_id: string
+          id: string
+        }
+        Insert: {
+          child_id: string
+          id: string
+        }
+        Update: {
+          child_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'teardown_grandchild_child_id_fkey'
+            columns: ['child_id']
+            referencedRelation: 'teardown_child'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       teardown_parent: {
         Row: {
           id: string

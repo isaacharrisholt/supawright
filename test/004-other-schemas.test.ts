@@ -9,6 +9,11 @@ test('can create in non-public schemas', async ({ supawright }) => {
   expect(record).toBeTruthy()
 })
 
+test('can create many records in non-public schemas', async ({ supawright }) => {
+  const records = await supawright.createMany('other', 'other_schemas_parent', 2)
+  expect(records).toHaveLength(2)
+})
+
 test('can recursively create in non-public schemas', async ({ supawright }) => {
   const record = await supawright.create('other', 'other_schemas_local_child')
   expect(record.parent_id).toBeTruthy()

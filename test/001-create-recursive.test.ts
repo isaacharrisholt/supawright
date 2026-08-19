@@ -157,6 +157,36 @@ test('dependency fixtures are reused', async ({ supawright }) => {
   expect(parent?.[0].required_foreign_key).toBe(data?.[0].required_foreign_key_1)
 })
 
+test('can create many records from inputs', async ({ supawright }) => {
+  const records = await supawright.createMany('create_recursive_parent_1', [
+    { id: 101, name: 'First' },
+    { id: 102, name: 'Second' },
+    { id: 103, name: 'Third' }
+  ])
+
+  expect(records.map((record) => record.name)).toEqual(['First', 'Second', 'Third'])
+  expect(supawright.fixtures('public', 'create_recursive_parent_1')).toHaveLength(3)
+})
+
+test('can create a count of records and reuse dependencies', async ({ supawright }) => {
+  const records = await supawright.createMany('create_recursive_requires_auth_user', 3)
+
+  expect(records).toHaveLength(3)
+  expect(new Set(records.map((record) => record.user_id)).size).toBe(1)
+  expect(
+    supawright.fixtures().filter((fixture) => fixture.schema === 'auth')
+  ).toHaveLength(1)
+  expect(
+    supawright.fixtures('public', 'create_recursive_requires_auth_user')
+  ).toHaveLength(3)
+})
+
+test('createMany rejects invalid counts', async ({ supawright }) => {
+  await expect(supawright.createMany('create_recursive_parent_1', -1)).rejects.toThrow(
+    'createMany count must be a non-negative safe integer'
+  )
+})
+
 test('auth users are recursively created', async ({ supawright }) => {
   const record = await supawright.create('create_recursive_requires_auth_user')
 
