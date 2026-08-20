@@ -118,6 +118,24 @@ When the test exits, Supawright will automatically clean up all the records
 it has created, and will inspect foreign key constraints to delete records in
 the correct order.
 
+### Creating multiple records
+
+Use `createMany` to insert several records together. It accepts either partial
+records or a count of fully generated records:
+
+```ts
+const namedUsers = await supawright.createMany('user', [
+  { email: 'one@supawrightmail.com' },
+  { email: 'two@supawrightmail.com' }
+])
+
+const generatedUsers = await supawright.createMany('user', 3)
+```
+
+Supawright resolves generated foreign keys in order before the bulk insert, so
+records in the same call reuse an existing dependency just as repeated calls to
+`create` do.
+
 It will also discover any additional records in the database that were not
 created by Supawright, and will delete them as well, provided they have a
 foreign key relationship with a record that was created by Supawright.

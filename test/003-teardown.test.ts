@@ -46,6 +46,49 @@ test('can successfully discover dependent records', async ({ supawright }) => {
   expect(data?.length).toBe(0)
 })
 
+test('discovers recursive dependent records once', async ({ supawright }) => {
+  const parent = await supawright.create('teardown_parent')
+  const children = Array.from({ length: 5 }, () => ({
+    id: faker.string.uuid(),
+    parent_id: parent.id
+  }))
+  const grandchildren = children.map((child) => ({
+    child_id: child.id,
+    id: faker.string.uuid()
+  }))
+  const supabase = supawright.supabase('public')
+
+  const { error: childInsertError } = await supabase
+    .from('teardown_child')
+    .insert(children)
+  expect(childInsertError).toBeNull()
+  const { error: grandchildInsertError } = await supabase
+    .from('teardown_grandchild')
+    .insert(grandchildren)
+  expect(grandchildInsertError).toBeNull()
+
+  await supawright.discoverRecords()
+
+  expect(supawright.fixtures('public', 'teardown_child')).toHaveLength(5)
+  expect(supawright.fixtures('public', 'teardown_grandchild')).toHaveLength(5)
+
+  await supawright.teardown()
+
+  const [{ data: remainingChildren }, { data: remainingGrandchildren }] =
+    await Promise.all([
+      supabase.from('teardown_child').select('id').eq('parent_id', parent.id),
+      supabase
+        .from('teardown_grandchild')
+        .select('id')
+        .in(
+          'id',
+          grandchildren.map((grandchild) => grandchild.id)
+        )
+    ])
+  expect(remainingChildren).toHaveLength(0)
+  expect(remainingGrandchildren).toHaveLength(0)
+})
+
 test('can successfully teardown an auth user', async ({ supawright }) => {
   const user = await supawright.createUser()
 
