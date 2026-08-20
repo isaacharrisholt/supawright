@@ -1,5 +1,11 @@
 # supawright
 
+## 0.5.0
+
+### Minor Changes
+
+- 82b1ac1: Reuse schema metadata within each test worker, avoid repeated queries while discovering recursively created records, and support bulk fixture creation with `createMany`.
+
 ## 0.4.2
 
 ### Patch Changes
