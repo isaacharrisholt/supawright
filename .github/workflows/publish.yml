@@ -4,11 +4,15 @@ on:
     workflows: ['Lint and test']
     types:
       - completed
-  push:
     branches:
-      - 'main'
+      - main
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
 
 jobs:
   publish:
@@ -21,8 +25,9 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
 
       - run: pnpm install --frozen-lockfile
       - name: Create Release Pull Request or Publish
@@ -32,4 +37,3 @@ jobs:
           publish: pnpm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

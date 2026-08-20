@@ -2,6 +2,10 @@
   "name": "supawright",
   "license": "MIT",
   "version": "0.5.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isaacharrisholt/supawright.git"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "dist/index.mjs",
