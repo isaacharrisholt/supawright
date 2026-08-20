@@ -4,9 +4,8 @@ on:
     workflows: ['Lint and test']
     types:
       - completed
-  push:
     branches:
-      - 'main'
+      - main
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
